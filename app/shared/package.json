@@ -1,0 +1,14 @@
+{
+  "name": "ai-trip-planner-shared",
+  "version": "1.0.0",
+  "description": "Shared utilities for AI Trip Planner",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "validator": "^13.11.0",
+    "date-fns": "^2.30.0"
+  }
+}

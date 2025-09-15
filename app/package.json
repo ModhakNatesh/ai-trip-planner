@@ -1,0 +1,55 @@
+{
+  "name": "ai-trip-planner",
+  "version": "1.0.0",
+  "description": "AI-powered trip planner with React + Node.js + Firebase",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "client": "cd client && npm run dev",
+    "server": "cd server && npm run dev",
+    "build": "cd client && npm run build",
+    "install-client": "cd client && npm install",
+    "install-server": "cd server && npm install",
+    "install-all": "npm install && npm run install-client && npm run install-server",
+    "lint": "npm run lint:client && npm run lint:server",
+    "lint:client": "cd client && npm run lint",
+    "lint:server": "cd server && npm run lint",
+    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
+    "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx,json,css,md}\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "prettier": "^3.1.0"
+  },
+  "workspaces": [
+    "client",
+    "server",
+    "shared"
+  ],
+  "overrides": {
+    "eslint": "^9.10.0",
+    "shelljs": "^0.8.5",
+    "babel-traverse": "^7.25.6",
+    "undici": "^6.21.2",
+    "vite": "^5.4.8"
+  },
+  "resolutions": {
+    "eslint": "^9.10.0",
+    "shelljs": "^0.8.5",
+    "babel-traverse": "^7.25.6", 
+    "undici": "^6.21.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "react",
+    "nodejs",
+    "firebase",
+    "vertex-ai",
+    "trip-planner",
+    "full-stack"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}
