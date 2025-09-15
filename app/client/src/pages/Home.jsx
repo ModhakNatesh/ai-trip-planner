@@ -1,11 +1,10 @@
 import { Link } from 'react-router-dom';
-import { MapPin, Sparkles, Globe, Clock } from 'lucide-react';
+import { Sparkles, Globe, Clock } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { useAuthStore } from '../store';
 import { useEffect, useState } from 'react';
 import { apiService } from '../services/api';
-import toast from 'react-hot-toast';
 
 const Home = () => {
   const { isAuthenticated } = useAuthStore();

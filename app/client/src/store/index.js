@@ -3,7 +3,7 @@ import { devtools } from 'zustand/middleware';
 
 export const useAuthStore = create(
   devtools(
-    (set, get) => ({
+    (set, _get) => ({
       user: null,
       isLoading: true,
       isAuthenticated: false,
@@ -32,7 +32,7 @@ export const useAuthStore = create(
 
 export const useTripStore = create(
   devtools(
-    (set, get) => ({
+    (set, _get) => ({
       trips: [],
       currentTrip: null,
       isLoading: false,

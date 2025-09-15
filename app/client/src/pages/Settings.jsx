@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { User, Save, Mail, Camera } from 'lucide-react';
+import { User, Save, Camera } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';

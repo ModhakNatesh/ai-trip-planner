@@ -20,7 +20,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     loadTrips();
-  }, []);
+  }, [loadTrips]);
 
   const loadTrips = async () => {
     setLoading(true);
@@ -78,7 +78,7 @@ const Dashboard = () => {
   const handleGenerateItinerary = async (trip) => {
     try {
       toast.loading('Generating itinerary...', { id: 'generate' });
-      const response = await apiService.generateItinerary(trip.id, {});
+      await apiService.generateItinerary(trip.id, {});
       toast.success('Itinerary generated successfully!', { id: 'generate' });
       loadTrips(); // Reload to get updated trip
     } catch (error) {

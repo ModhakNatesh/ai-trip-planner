@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { MapPin, User, Settings, LogOut } from 'lucide-react';
+import { MapPin, Settings, LogOut } from 'lucide-react';
 import { Button } from './ui/button';
 import { useAuthStore } from '../store';
 import { useAuth } from './AuthProvider';
