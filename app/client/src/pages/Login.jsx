@@ -4,7 +4,7 @@ import { Mail, Lock, User, Chrome } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { useAuth } from '../components/AuthProvider';
+import { useAuth } from '../hooks/useAuth';
 import { useAuthStore } from '../store';
 import toast from 'react-hot-toast';
 
