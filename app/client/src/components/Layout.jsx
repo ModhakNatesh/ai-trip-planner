@@ -2,7 +2,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { MapPin, Settings, LogOut } from 'lucide-react';
 import { Button } from './ui/button';
 import { useAuthStore } from '../store';
-import { useAuth } from './AuthProvider';
+import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
 
 const Layout = ({ children }) => {
