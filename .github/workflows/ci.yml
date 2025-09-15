@@ -10,6 +10,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: app  
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
