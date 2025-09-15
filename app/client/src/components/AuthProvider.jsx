@@ -1,8 +1,7 @@
-import { createContext, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useAuthStore } from '../store';
 import { authService } from '../services/auth';
-
-export const AuthContext = createContext();
+import { AuthContext } from '../contexts/AuthContext';
 
 export const AuthProvider = ({ children }) => {
   const { setUser, clearUser, setLoading } = useAuthStore();
