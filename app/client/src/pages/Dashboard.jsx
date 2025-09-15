@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Plus, MapPin, Calendar, DollarSign, Trash2, Edit } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -18,11 +18,7 @@ const Dashboard = () => {
     budget: ''
   });
 
-  useEffect(() => {
-    loadTrips();
-  }, [loadTrips]);
-
-  const loadTrips = async () => {
+  const loadTrips = useCallback(async () => {
     setLoading(true);
     try {
       const response = await apiService.getTrips();
@@ -33,7 +29,11 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [setLoading, setTrips]);
+
+  useEffect(() => {
+    loadTrips();
+  }, [loadTrips]);
 
   const handleInputChange = (e) => {
     setFormData({
