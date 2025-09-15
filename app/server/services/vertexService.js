@@ -291,7 +291,7 @@ class VertexAIService {
     };
   }
 
-  getFallbackResponse(prompt) {
+  getFallbackResponse(_prompt) {
     return {
       title: "Trip Planning Assistant",
       message: "I'm currently experiencing technical difficulties, but I'd be happy to help you plan your trip! Here are some general suggestions:",
@@ -309,7 +309,7 @@ class VertexAIService {
   }
 
   delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise(resolve => global.setTimeout(resolve, ms));
   }
 
   // Method to switch to real Vertex AI implementation

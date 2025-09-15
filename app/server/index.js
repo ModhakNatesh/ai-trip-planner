@@ -16,7 +16,6 @@ import tripRoutes from './routes/trips.js';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler.js';
-import { authenticateToken } from './middleware/auth.js';
 
 // Load environment variables
 dotenv.config();

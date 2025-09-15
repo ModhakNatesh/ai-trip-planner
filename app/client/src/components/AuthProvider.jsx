@@ -1,16 +1,7 @@
-import { createContext, useContext, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useAuthStore } from '../store';
 import { authService } from '../services/auth';
-
-const AuthContext = createContext();
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+import { AuthContext } from '../contexts/AuthContext';
 
 export const AuthProvider = ({ children }) => {
   const { setUser, clearUser, setLoading } = useAuthStore();

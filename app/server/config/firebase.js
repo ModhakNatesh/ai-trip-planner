@@ -15,8 +15,6 @@ dotenv.config({ path: path.join(__dirname, '..', '..', '.env') });
 let admin;
 
 try {
-  // Check if we're in development with mock credentials
-  const isDevelopment = process.env.NODE_ENV === 'development';
   const projectId = process.env.FIREBASE_PROJECT_ID;
   
   console.log('🔧 Firebase Config Debug:', {
