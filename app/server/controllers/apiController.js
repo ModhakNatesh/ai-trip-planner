@@ -12,10 +12,11 @@ export class ApiController {
           health: '/health'
         }
       });
-    } catch (error) {
+    } catch (err) {
       res.status(500).json({
         success: false,
-        error: 'Internal server error'
+        error: 'Internal server error',
+        details: err.message
       });
     }
   }
@@ -34,10 +35,11 @@ export class ApiController {
         memory: process.memoryUsage(),
         timestamp: new Date().toISOString()
       });
-    } catch (error) {
+    } catch (err) {
       res.status(500).json({
         success: false,
-        error: 'Failed to get status'
+        error: 'Failed to get status',
+        details: err.message
       });
     }
   }
