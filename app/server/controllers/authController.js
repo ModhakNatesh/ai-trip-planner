@@ -51,21 +51,22 @@ export class AuthController {
         });
       }
 
-      // Get user from Firestore
-      const userDoc = await db.collection('users').doc(uid).get();
+      // Get user from Realtime Database
+      const userRef = db.ref(`users/${uid}`);
+      const snapshot = await userRef.once('value');
       
-      if (!userDoc.exists) {
+      if (!snapshot.exists()) {
         // Create user document if it doesn't exist
         const userData = {
           uid: req.user.uid,
           email: req.user.email,
           name: req.user.name,
           picture: req.user.picture,
-          createdAt: new Date(),
-          updatedAt: new Date()
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
         };
         
-        await db.collection('users').doc(uid).set(userData);
+        await userRef.set(userData);
         
         return res.json({
           success: true,
@@ -75,7 +76,7 @@ export class AuthController {
 
       res.json({
         success: true,
-        user: userDoc.data()
+        user: snapshot.val()
       });
     } catch (error) {
       console.error('Get user error:', error);
@@ -88,11 +89,9 @@ export class AuthController {
 
   static async updateUser(req, res) {
     try {
-      // Handle unauthenticated users gracefully
       const uid = req.user?.uid || 'anonymous';
       const { name, preferences } = req.body;
 
-      // For anonymous users, return a demo response
       if (uid === 'anonymous') {
         return res.json({
           success: true,
@@ -116,10 +115,12 @@ export class AuthController {
       const updateData = {
         ...(name && { name }),
         ...(preferences && { preferences }),
-        updatedAt: new Date()
+        updatedAt: new Date().toISOString()
       };
 
-      await db.collection('users').doc(uid).update(updateData);
+      // Update in Realtime Database
+      const userRef = db.ref(`users/${uid}`);
+      await userRef.update(updateData);
 
       res.json({
         success: true,
