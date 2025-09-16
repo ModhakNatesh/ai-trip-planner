@@ -23,10 +23,6 @@ const TripDetails = () => {
   const [trip, setTrip] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    loadTripDetails();
-  }, [loadTripDetails]);
-
   const loadTripDetails = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -45,6 +41,10 @@ const TripDetails = () => {
       setIsLoading(false);
     }
   }, [id, navigate]);
+
+  useEffect(() => {
+    loadTripDetails();
+  }, [loadTripDetails]);
 
   const handleGenerateItinerary = async () => {
     try {
