@@ -32,10 +32,10 @@ const Settings = () => {
       setFormData({
         name: user.displayName || '',
         email: user.email || '',
-        preferences: user.preferences || {
-          budget: '',
-          travelStyle: '',
-          interests: [],
+        preferences: {
+          budget: user.preferences?.budget || '',
+          travelStyle: user.preferences?.travelStyle || '',
+          interests: user.preferences?.interests || [],
         },
       });
     }
@@ -62,15 +62,18 @@ const Settings = () => {
   };
 
   const handleInterestToggle = (interest) => {
-    setFormData((prev) => ({
-      ...prev,
-      preferences: {
-        ...prev.preferences,
-        interests: prev.preferences.interests.includes(interest)
-          ? prev.preferences.interests.filter((i) => i !== interest)
-          : [...prev.preferences.interests, interest],
-      },
-    }));
+    setFormData((prev) => {
+      const currentInterests = prev.preferences.interests || [];
+      return {
+        ...prev,
+        preferences: {
+          ...prev.preferences,
+          interests: currentInterests.includes(interest)
+            ? currentInterests.filter((i) => i !== interest)
+            : [...currentInterests, interest],
+        },
+      };
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -288,9 +291,9 @@ const Settings = () => {
                   >
                     <input
                       type="checkbox"
-                      checked={formData.preferences.interests.includes(
+                      checked={formData.preferences.interests?.includes(
                         interest
-                      )}
+                      ) || false}
                       onChange={() => handleInterestToggle(interest)}
                       className="rounded border-gray-300 text-primary focus:ring-primary"
                     />

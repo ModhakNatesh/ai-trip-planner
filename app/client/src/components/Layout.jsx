@@ -78,42 +78,58 @@ const Layout = ({ children }) => {
 
 
             {/* Actions */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4">
               {isAuthenticated ? (
                 <>
                   {!isDashboardPage && (
-                    <Link to="/dashboard">
+                    <Link to="/dashboard" className="hidden sm:block">
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="rounded-xl bg-white/5 hover:bg-white/10 text-white border border-white/10 hover:border-white/20 transition-all duration-300 font-semibold px-6 py-2 h-auto backdrop-blur-sm"
+                        className="rounded-xl bg-white/5 hover:bg-white/10 text-white border border-white/10 hover:border-white/20 transition-all duration-300 font-semibold px-4 sm:px-6 py-2 h-auto backdrop-blur-sm"
                       >
                         Dashboard
                       </Button>
                     </Link>
                   )}
 
-                  <div className="flex items-center gap-3 px-4 py-2 bg-white/10 rounded-2xl border border-white/20 shadow-lg backdrop-blur-sm">
+                  {/* Dynamic Profile Section */}
+                  <div className="flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-2 bg-white/10 rounded-xl sm:rounded-2xl border border-white/20 shadow-lg backdrop-blur-sm min-w-0 flex-shrink-0">
                     <img
                       src={
                         user?.photoURL ||
-                        `https://ui-avatars.com/api/?name=${user?.displayName || user?.email}&background=8b5cf6&color=fff&bold=true`
+                        `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.displayName || user?.email || 'User')}&background=8b5cf6&color=fff&bold=true`
                       }
                       alt="Profile"
-                      className="h-9 w-9 rounded-full ring-2 ring-white/30"
+                      className="h-7 w-7 sm:h-9 sm:w-9 rounded-full ring-1 sm:ring-2 ring-white/30 flex-shrink-0"
                     />
-                    <span className="text-sm font-semibold text-white/90 max-w-32 truncate">
-                      {user?.displayName || user?.email}
-                    </span>
+                    <div className="min-w-0 flex-1 hidden sm:block">
+                      <span className="text-xs sm:text-sm font-semibold text-white/90 block truncate max-w-[120px] md:max-w-[160px] lg:max-w-[200px]">
+                        {user?.displayName || user?.email?.split('@')[0] || user?.email}
+                      </span>
+                    </div>
                   </div>
+
+                  {/* Mobile Dashboard Link */}
+                  {!isDashboardPage && (
+                    <Link to="/dashboard" className="sm:hidden">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="rounded-xl hover:bg-white/10 text-white/80 hover:text-white transition-all duration-300 p-2"
+                      >
+                        <Compass className="h-5 w-5" />
+                      </Button>
+                    </Link>
+                  )}
 
                   <Link to="/settings">
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="rounded-xl hover:bg-white/10 text-white/80 hover:text-white transition-all duration-300 p-3"
+                      className="rounded-xl hover:bg-white/10 text-white/80 hover:text-white transition-all duration-300 p-2 sm:p-3"
                     >
-                      <Settings className="h-5 w-5" />
+                      <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
                     </Button>
                   </Link>
 
@@ -121,9 +137,9 @@ const Layout = ({ children }) => {
                     variant="ghost"
                     size="sm"
                     onClick={handleSignOut}
-                    className="rounded-xl hover:bg-red-500/20 text-white/80 hover:text-red-300 transition-all duration-300 p-3"
+                    className="rounded-xl hover:bg-red-500/20 text-white/80 hover:text-red-300 transition-all duration-300 p-2 sm:p-3"
                   >
-                    <LogOut className="h-5 w-5" />
+                    <LogOut className="h-4 w-4 sm:h-5 sm:w-5" />
                   </Button>
                 </>
               ) : (
@@ -132,7 +148,7 @@ const Layout = ({ children }) => {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="rounded-xl bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-600 hover:to-purple-700 text-white font-semibold px-6 py-2 h-auto border-0 transition-all duration-300 transform hover:scale-105 shadow-lg"
+                      className="rounded-xl bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-600 hover:to-purple-700 text-white font-semibold px-4 sm:px-6 py-2 h-auto border-0 transition-all duration-300 transform hover:scale-105 shadow-lg"
                     >
                       Sign In
                     </Button>
