@@ -52,11 +52,11 @@ export const apiService = {
 
   // Auth endpoints
   verifyToken: (token) => api.post('/api/auth/verify-token', { token }),
-  getUser: () => api.get('/api/auth/user'),
-  updateUser: (userData) => api.put('/api/auth/user', userData),
+  getUser: (token) => api.get('/api/auth/user', token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+  updateUser: (userData, token) => api.put('/api/auth/user', userData, token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
 
   // Trip endpoints
-  getTrips: () => api.get('/api/trips'),
+  getTrips: (token) => api.get('/api/trips', token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
   createTrip: (tripData) => api.post('/api/trips', tripData),
   getTripById: (id) => api.get(`/api/trips/${id}`),
   updateTrip: (id, updateData) => api.put(`/api/trips/${id}`, updateData),
