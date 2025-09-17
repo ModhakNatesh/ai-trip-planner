@@ -5,6 +5,7 @@ import { Input } from '../components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { useAuthStore } from '../store';
 import { apiService } from '../services/api';
+import { auth } from '../config/firebase';
 import toast from 'react-hot-toast';
 
 const Settings = () => {
@@ -71,10 +72,12 @@ const Settings = () => {
     setIsLoading(true);
 
     try {
+      // Attach auth token to the request so server can persist to the correct user
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
       await apiService.updateUser({
         name: formData.name,
         preferences: formData.preferences
-      });
+      }, token);
       
       updateUser({
         displayName: formData.name,
