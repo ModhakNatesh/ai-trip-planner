@@ -291,6 +291,7 @@ class VertexAIService {
     };
   }
 
+  // eslint-disable-next-line no-unused-vars
   getFallbackResponse(_prompt) {
     return {
       title: "Trip Planning Assistant",
