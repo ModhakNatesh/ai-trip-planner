@@ -1,7 +1,11 @@
 import express from 'express';
 import { TripController } from '../controllers/tripController.js';
+import { optionalAuth } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// Apply optional auth middleware to all trip routes
+router.use(optionalAuth);
 
 // Trip routes
 router.get('/', TripController.getUserTrips);

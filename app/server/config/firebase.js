@@ -1,6 +1,6 @@
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getDatabase } from 'firebase-admin/database'; // Changed from firestore
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -9,7 +9,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables from the app root (go up from server/config to app root)
+// Load environment variables from the app root
 dotenv.config({ path: path.join(__dirname, '..', '..', '.env') });
 
 let admin;
@@ -24,7 +24,6 @@ try {
     HAS_CLIENT_EMAIL: !!process.env.FIREBASE_CLIENT_EMAIL
   });
   
-  // Always use the real Firebase configuration since you have real credentials
   const serviceAccount = {
     type: 'service_account',
     project_id: projectId,
@@ -40,7 +39,7 @@ try {
 
   admin = initializeApp({
     credential: cert(serviceAccount),
-    databaseURL: `https://${projectId}-default-rtdb.firebaseio.com`
+    databaseURL: `https://${projectId}-default-rtdb.firebaseio.com/` // Your Realtime DB URL
   });
 
   console.log('✅ Firebase Admin SDK initialized successfully');
@@ -51,6 +50,6 @@ try {
 
 // Export Firebase services
 export const auth = admin ? getAuth(admin) : null;
-export const db = admin ? getFirestore(admin) : null;
+export const db = admin ? getDatabase(admin) : null; // Changed from getFirestore
 
 export default admin;

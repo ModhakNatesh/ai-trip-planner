@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, MapPin, Calendar, DollarSign, Trash2, Edit } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, MapPin, Calendar, DollarSign, Trash2, Edit, Eye } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -8,6 +9,7 @@ import { apiService } from '../services/api';
 import toast from 'react-hot-toast';
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const { user } = useAuthStore();
   const { trips, setTrips, addTrip, deleteTrip, isLoading, setLoading } = useTripStore();
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -209,56 +211,83 @@ const Dashboard = () => {
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {trips.map((trip) => (
-              <Card key={trip.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <MapPin className="h-5 w-5 mr-2 text-primary" />
-                    {trip.destination}
-                  </CardTitle>
-                  <CardDescription>
-                    <span className={`inline-block px-2 py-1 rounded-full text-xs ${
-                      trip.status === 'planning' ? 'bg-yellow-100 text-yellow-800' :
-                      trip.status === 'planned' ? 'bg-green-100 text-green-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {trip.status}
-                    </span>
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-center text-sm text-gray-600">
-                      <Calendar className="h-4 w-4 mr-2" />
-                      {formatDate(trip.startDate)} - {formatDate(trip.endDate)}
-                    </div>
-                    {trip.budget && (
+              <Card key={trip.id} className="hover:shadow-lg transition-shadow cursor-pointer">
+                <div onClick={() => navigate(`/trip/${trip.id}`)}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <MapPin className="h-5 w-5 mr-2 text-primary" />
+                      {trip.destination}
+                    </CardTitle>
+                    <CardDescription>
+                      <span className={`inline-block px-2 py-1 rounded-full text-xs ${
+                        trip.status === 'planning' ? 'bg-yellow-100 text-yellow-800' :
+                        trip.status === 'planned' ? 'bg-green-100 text-green-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {trip.status}
+                      </span>
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 mb-4">
                       <div className="flex items-center text-sm text-gray-600">
-                        <DollarSign className="h-4 w-4 mr-2" />
-                        ${trip.budget}
+                        <Calendar className="h-4 w-4 mr-2" />
+                        {formatDate(trip.startDate)} - {formatDate(trip.endDate)}
                       </div>
-                    )}
-                  </div>
-                  
+                      {trip.budget && (
+                        <div className="flex items-center text-sm text-gray-600">
+                          <DollarSign className="h-4 w-4 mr-2" />
+                          ${trip.budget}
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </div>
+                
+                <CardContent className="pt-0">
                   <div className="space-y-2">
                     {trip.status === 'planning' && (
                       <Button 
                         size="sm" 
                         className="w-full"
-                        onClick={() => handleGenerateItinerary(trip)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleGenerateItinerary(trip);
+                        }}
                       >
                         Generate Itinerary
                       </Button>
                     )}
                     
                     <div className="flex space-x-2">
-                      <Button size="sm" variant="outline" className="flex-1">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="flex-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/trip/${trip.id}`);
+                        }}
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        View
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="flex-1"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <Edit className="h-4 w-4 mr-1" />
                         Edit
                       </Button>
                       <Button 
                         size="sm" 
                         variant="outline" 
-                        onClick={() => handleDeleteTrip(trip.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteTrip(trip.id);
+                        }}
                         className="text-red-600 hover:text-red-700"
                       >
                         <Trash2 className="h-4 w-4" />
