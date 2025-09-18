@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, MapPin, Calendar, DollarSign, Trash2, Edit, Eye, Plane, Globe, Clock, Star, Navigation, Sparkles } from 'lucide-react';
+import { Plus, MapPin, Calendar, DollarSign, Trash2, Edit, Eye, Plane, Globe, Clock, Star, Navigation, Sparkles, Users } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -17,7 +17,9 @@ const Dashboard = () => {
     destination: '',
     startDate: '',
     endDate: '',
-    budget: ''
+    budget: '',
+    numberOfUsers: 1,
+    participants: []
   });
 
   const loadTrips = useCallback(async () => {
@@ -52,11 +54,34 @@ const Dashboard = () => {
       return;
     }
 
+    // Validate participant emails if there are any
+    if (formData.numberOfUsers > 1) {
+      if (formData.participants.length !== formData.numberOfUsers - 1) {
+        toast.error('Please add all participant emails');
+        return;
+      }
+
+      // Check if all participant emails are valid
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const invalidEmails = formData.participants.filter(email => !emailRegex.test(email));
+      if (invalidEmails.length > 0) {
+        toast.error('Please enter valid email addresses for all participants');
+        return;
+      }
+
+      // Check for duplicate emails
+      const uniqueEmails = new Set(formData.participants);
+      if (uniqueEmails.size !== formData.participants.length) {
+        toast.error('Each participant must have a unique email address');
+        return;
+      }
+    }
+
     try {
       const response = await apiService.createTrip(formData);
       addTrip(response.data.trip);
       toast.success('Trip created successfully!');
-      setFormData({ destination: '', startDate: '', endDate: '', budget: '' });
+      setFormData({ destination: '', startDate: '', endDate: '', budget: '', numberOfUsers: 1, participants: [] });
       setShowCreateForm(false);
     } catch (error) {
       toast.error('Failed to create trip');
@@ -270,6 +295,53 @@ const Dashboard = () => {
                         />
                       </div>
 
+                      <div className="space-y-2 col-span-2">
+                        <label htmlFor="numberOfUsers" className="block text-sm font-semibold text-slate-700">
+                          Number of Participants (including you)
+                        </label>
+                        <Input
+                          id="numberOfUsers"
+                          name="numberOfUsers"
+                          type="number"
+                          min="1"
+                          value={formData.numberOfUsers}
+                          onChange={(e) => {
+                            const newValue = Math.max(1, parseInt(e.target.value) || 1);
+                            setFormData(prev => ({
+                              ...prev,
+                              numberOfUsers: newValue,
+                              participants: prev.participants.slice(0, newValue - 1)
+                            }));
+                          }}
+                          className="border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 h-12"
+                        />
+                      </div>
+
+                      {formData.numberOfUsers > 1 && (
+                        <div className="col-span-2 space-y-4">
+                          <label className="block text-sm font-semibold text-slate-700">
+                            Participant Emails
+                          </label>
+                          {Array.from({ length: formData.numberOfUsers - 1 }).map((_, index) => (
+                            <Input
+                              key={index}
+                              type="email"
+                              placeholder={`Participant ${index + 1} email`}
+                              value={formData.participants[index] || ''}
+                              onChange={(e) => {
+                                const newParticipants = [...formData.participants];
+                                newParticipants[index] = e.target.value;
+                                setFormData(prev => ({
+                                  ...prev,
+                                  participants: newParticipants
+                                }));
+                              }}
+                              className="border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 h-12"
+                            />
+                          ))}
+                        </div>
+                      )}
+
                     </div>
                     <div className="flex space-x-4 pt-4">
                       <Button
@@ -319,101 +391,190 @@ const Dashboard = () => {
               </Card>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {trips.map((trip, index) => (
-                <Card
-                  key={trip.id}
-                  className="bg-white/80 backdrop-blur-md border-0 shadow-xl rounded-2xl overflow-hidden hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 group cursor-pointer"
-                  style={{
-                    animationDelay: `${index * 100}ms`
-                  }}
-                >
-                  <div className={`h-2 bg-gradient-to-r ${getStatusGradient(trip.status)}`}></div>
-                  <div onClick={() => navigate(`/trip/${trip.id}`)}>
-                    <CardHeader className="pb-4">
-                      <CardTitle className="flex items-center text-slate-800 group-hover:text-blue-600 transition-colors duration-300">
-                        <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-500 rounded-lg flex items-center justify-center mr-3">
-                          <MapPin className="h-4 w-4 text-white" />
-                        </div>
-                        {trip.destination}
-                      </CardTitle>
-                      <CardDescription className="flex items-center mt-2">
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r ${getStatusGradient(trip.status)} text-white shadow-md`}>
-                          <div className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></div>
-                          {trip.status.charAt(0).toUpperCase() + trip.status.slice(1)}
-                        </span>
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3 mb-6">
-                        <div className="flex items-center text-sm text-slate-600 bg-slate-50 rounded-lg p-3">
-                          <Calendar className="h-4 w-4 mr-2 text-blue-500" />
-                          <span className="font-medium">{formatDate(trip.startDate)} - {formatDate(trip.endDate)}</span>
-                        </div>
-                        {trip.budget && (
-                          <div className="flex items-center text-sm text-slate-600 bg-slate-50 rounded-lg p-3">
-                            <DollarSign className="h-4 w-4 mr-2 text-emerald-500" />
-                            <span className="font-medium">${parseInt(trip.budget).toLocaleString()}</span>
+            <div className="space-y-12">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-800 mb-6 flex items-center">
+                  <Plane className="h-6 w-6 mr-2 text-blue-500" />
+                  Your Trips
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {trips.filter(trip => trip.role === 'owner').map((trip, index) => (
+                    <Card
+                      key={trip.id}
+                      className="bg-white/80 backdrop-blur-md border-0 shadow-xl rounded-2xl overflow-hidden hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 group cursor-pointer"
+                      style={{
+                        animationDelay: `${index * 100}ms`
+                      }}
+                    >
+                      <div className={`h-2 bg-gradient-to-r ${getStatusGradient(trip.status)}`}></div>
+                      <div onClick={() => navigate(`/trip/${trip.id}`)}>
+                        <CardHeader className="pb-4">
+                          <CardTitle className="flex items-center text-slate-800 group-hover:text-blue-600 transition-colors duration-300">
+                            <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-500 rounded-lg flex items-center justify-center mr-3">
+                              <MapPin className="h-4 w-4 text-white" />
+                            </div>
+                            {trip.destination}
+                          </CardTitle>
+                          <CardDescription className="flex items-center mt-2">
+                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r ${getStatusGradient(trip.status)} text-white shadow-md`}>
+                              <div className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></div>
+                              {trip.status.charAt(0).toUpperCase() + trip.status.slice(1)}
+                            </span>
+                            <span className="ml-2 text-xs text-blue-600 font-medium bg-blue-50 px-2 py-1 rounded">Owner</span>
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-3 mb-6">
+                            <div className="flex items-center text-sm text-slate-600 bg-slate-50 rounded-lg p-3">
+                              <Calendar className="h-4 w-4 mr-2 text-blue-500" />
+                              <span className="font-medium">{formatDate(trip.startDate)} - {formatDate(trip.endDate)}</span>
+                            </div>
+                            {trip.budget && (
+                              <div className="flex items-center text-sm text-slate-600 bg-slate-50 rounded-lg p-3">
+                                <DollarSign className="h-4 w-4 mr-2 text-emerald-500" />
+                                <span className="font-medium">${parseInt(trip.budget).toLocaleString()}</span>
+                              </div>
+                            )}
+                            {trip.participants && trip.participants.length > 0 && (
+                              <div className="flex items-center text-sm text-slate-600 bg-slate-50 rounded-lg p-3">
+                                <Users className="h-4 w-4 mr-2 text-blue-500" />
+                                <span className="font-medium">{trip.participants.length + 1} Participants</span>
+                              </div>
+                            )}
                           </div>
-                        )}
+                        </CardContent>
                       </div>
-                    </CardContent>
+                      <CardContent className="pt-0">
+                        <div className="space-y-3">
+                          {trip.status === 'planning' && (
+                            <Button
+                              size="sm"
+                              className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold py-2 rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleGenerateItinerary(trip);
+                              }}
+                            >
+                              <Sparkles className="h-4 w-4 mr-2" />
+                              Generate AI Itinerary
+                            </Button>
+                          )}
+                          <div className="flex space-x-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1 border-slate-200 text-slate-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 rounded-lg transition-all duration-300"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/trip/${trip.id}`);
+                              }}
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              View
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1 border-slate-200 text-slate-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 rounded-lg transition-all duration-300"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Edit className="h-4 w-4 mr-1" />
+                              Edit
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteTrip(trip.id);
+                              }}
+                              className="border-slate-200 text-red-500 hover:bg-red-50 hover:border-red-300 hover:text-red-600 rounded-lg transition-all duration-300"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+
+              {/* Participated Trips Section */}
+              {trips.some(trip => trip.role === 'participant') && (
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-800 mb-6 flex items-center">
+                    <Users className="h-6 w-6 mr-2 text-purple-500" />
+                    Trips You are Part Of
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    {trips.filter(trip => trip.role === 'participant').map((trip, index) => (
+                      <Card
+                        key={trip.id}
+                        className="bg-white/80 backdrop-blur-md border-0 shadow-xl rounded-2xl overflow-hidden hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 group cursor-pointer"
+                        style={{
+                          animationDelay: `${index * 100}ms`
+                        }}
+                      >
+                        <div className={`h-2 bg-gradient-to-r ${getStatusGradient(trip.status)}`}></div>
+                        <div onClick={() => navigate(`/trip/${trip.id}`)}>
+                          <CardHeader className="pb-4">
+                            <CardTitle className="flex items-center text-slate-800 group-hover:text-blue-600 transition-colors duration-300">
+                              <div className="w-8 h-8 bg-gradient-to-br from-purple-400 to-pink-500 rounded-lg flex items-center justify-center mr-3">
+                                <MapPin className="h-4 w-4 text-white" />
+                              </div>
+                              {trip.destination}
+                            </CardTitle>
+                            <CardDescription className="flex items-center mt-2">
+                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r ${getStatusGradient(trip.status)} text-white shadow-md`}>
+                                <div className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></div>
+                                {trip.status.charAt(0).toUpperCase() + trip.status.slice(1)}
+                              </span>
+                              <span className="ml-2 text-xs text-purple-600 font-medium bg-purple-50 px-2 py-1 rounded">Participant</span>
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-3">
+                              <div className="flex items-center text-sm text-slate-600 bg-slate-50 rounded-lg p-3">
+                                <Calendar className="h-4 w-4 mr-2 text-purple-500" />
+                                <span className="font-medium">{formatDate(trip.startDate)} - {formatDate(trip.endDate)}</span>
+                              </div>
+                              {trip.budget && (
+                                <div className="flex items-center text-sm text-slate-600 bg-slate-50 rounded-lg p-3">
+                                  <DollarSign className="h-4 w-4 mr-2 text-emerald-500" />
+                                  <span className="font-medium">${parseInt(trip.budget).toLocaleString()}</span>
+                                </div>
+                              )}
+                              {trip.participants && trip.participants.length > 0 && (
+                                <div className="flex items-center text-sm text-slate-600 bg-slate-50 rounded-lg p-3">
+                                  <Users className="h-4 w-4 mr-2 text-purple-500" />
+                                  <span className="font-medium">{trip.participants.length + 1} Participants</span>
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </div>
+                        <CardContent className="pt-0">
+                          <div className="space-y-3">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="w-full border-slate-200 text-slate-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 rounded-lg transition-all duration-300"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/trip/${trip.id}`);
+                              }}
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              View Trip Details
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
-
-                  <CardContent className="pt-0">
-                    <div className="space-y-3">
-                      {trip.status === 'planning' && (
-                        <Button
-                          size="sm"
-                          className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold py-2 rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleGenerateItinerary(trip);
-                          }}
-                        >
-                          <Sparkles className="h-4 w-4 mr-2" />
-                          Generate AI Itinerary
-                        </Button>
-                      )}
-
-                      <div className="flex space-x-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="flex-1 border-slate-200 text-slate-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 rounded-lg transition-all duration-300"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/trip/${trip.id}`);
-                          }}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          View
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="flex-1 border-slate-200 text-slate-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 rounded-lg transition-all duration-300"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Edit className="h-4 w-4 mr-1" />
-                          Edit
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteTrip(trip.id);
-                          }}
-                          className="border-slate-200 text-red-500 hover:bg-red-50 hover:border-red-300 hover:text-red-600 rounded-lg transition-all duration-300"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                </div>
+              )}
             </div>
           )}
         </div>

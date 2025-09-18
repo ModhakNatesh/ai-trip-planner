@@ -10,7 +10,8 @@ import {
   Car,
   Camera,
   Info,
-  Star
+  Star,
+  Users
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -152,7 +153,7 @@ const TripDetails = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-4 gap-6">
             <div className="flex items-center">
               <Calendar className="h-5 w-5 mr-3" />
               <div>
@@ -173,11 +174,61 @@ const TripDetails = () => {
               <div className="flex items-center">
                 <DollarSign className="h-5 w-5 mr-3" />
                 <div>
-                  <p className="font-medium">${trip.budget}</p>
+                  <p className="font-medium">${parseInt(trip.budget).toLocaleString()}</p>
                   <p className="text-sm text-blue-200">Budget</p>
                 </div>
               </div>
             )}
+
+            <div className="flex items-center">
+              <Users className="h-5 w-5 mr-3" />
+              <div>
+                <p className="font-medium">{(trip.participants?.length || 0) + 1} Participants</p>
+                <p className="text-sm text-blue-200">Trip Members</p>
+              </div>
+            </div>
+          </div>
+          <div className="mt-6 pt-6 border-t border-blue-500/20">
+            <h3 className="text-lg font-medium mb-3">Trip Members</h3>
+            <div className="space-y-2">
+              {/* Always show owner */}
+              <div className="flex items-center justify-between bg-blue-500/10 rounded-lg px-3 py-2">
+                <div className="flex items-center">
+                  <Users className="h-4 w-4 mr-2" />
+                  <span className="font-medium">{trip.ownerName || trip.ownerEmail || 'Trip Owner'}</span>
+                  {trip.ownerEmail && (
+                    <span className="ml-2 text-sm text-blue-700/60">{trip.ownerEmail}</span>
+                  )}
+                </div>
+                <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded">Owner</span>
+              </div>
+
+              {/* Show participants */}
+              {trip.participantDetails ? (
+                trip.participantDetails.map((participant) => (
+                  <div key={participant.email} className="flex items-center justify-between bg-blue-500/10 rounded-lg px-3 py-2">
+                    <div className="flex items-center">
+                      <Users className="h-4 w-4 mr-2" />
+                      <span className="font-medium">{participant.name}</span>
+                      <span className="ml-2 text-sm text-blue-700/60">{participant.email}</span>
+                    </div>
+                    <span className="text-xs bg-purple-500 text-white px-2 py-0.5 rounded">Member</span>
+                  </div>
+                ))
+              ) : trip.participants && trip.participants.length > 0 ? (
+                // Fallback to just emails if no details available
+                trip.participants.map((email) => (
+                  <div key={email} className="flex items-center justify-between bg-blue-500/10 rounded-lg px-3 py-2">
+                    <div className="flex items-center">
+                      <Users className="h-4 w-4 mr-2" />
+                      <span className="font-medium">{email.split('@')[0]}</span>
+                      <span className="ml-2 text-sm text-blue-700/60">{email}</span>
+                    </div>
+                    <span className="text-xs bg-purple-500 text-white px-2 py-0.5 rounded">Member</span>
+                  </div>
+                ))
+              ) : null}
+            </div>
           </div>
         </CardContent>
       </Card>

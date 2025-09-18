@@ -15,4 +15,9 @@ router.put('/:id', TripController.updateTrip);
 router.delete('/:id', TripController.deleteTrip);
 router.post('/:id/generate-itinerary', TripController.generateItinerary);
 
+// Participant management routes
+router.post('/:tripId/participants', TripController.addParticipants);
+router.delete('/:tripId/participants/:email', TripController.removeParticipant);
+router.get('/:tripId/participants', TripController.getParticipants);
+
 export default router;
