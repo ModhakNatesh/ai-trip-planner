@@ -1,5 +1,6 @@
 import { db } from '../config/firebase.js';
 import { callVertexAI } from '../services/vertexService.js';
+import { UserService } from '../services/userService.js';
 
 export class TripController {
   static async getUserTrips(req, res) {
@@ -113,6 +114,8 @@ export class TripController {
 
       const tripData = {
         userId: uid,
+        userEmail: req.user.email, // Store owner's email
+        userName: req.user.displayName || req.user.email.split('@')[0], // Store owner's name
         destination,
         startDate: new Date(startDate).toISOString(),
         endDate: new Date(endDate).toISOString(),
@@ -176,12 +179,14 @@ export class TripController {
         const allTripsSnapshot = await allTripsRef.once('value');
 
         allTripsSnapshot.forEach((userSnapshot) => {
+          const ownerId = userSnapshot.key; // Get the owner's user ID
           userSnapshot.forEach((tripSnapshot) => {
             if (tripSnapshot.key === id) {
               const potentialTrip = tripSnapshot.val();
               if (potentialTrip.participants && potentialTrip.participants.includes(userEmail)) {
                 trip = potentialTrip;
                 trip.id = tripSnapshot.key;
+                trip.ownerId = ownerId; // Store the owner's ID
                 role = 'participant';
               }
             }
@@ -196,12 +201,50 @@ export class TripController {
         });
       }
 
+      // Determine owner details
+      let ownerName, ownerEmail;
+      
+      if (role === 'owner') {
+        // If current user is owner, use their details from the request
+        ownerName = req.user.displayName || req.user.email.split('@')[0];
+        ownerEmail = req.user.email;
+      } else {
+        // For participants, use the stored trip owner details
+        ownerName = trip.userName || trip.userEmail?.split('@')[0];
+        ownerEmail = trip.userEmail;
+
+        // If stored details are missing, try to fetch from users collection
+        if (!ownerName || !ownerEmail) {
+          const owner = await UserService.getUserById(trip.userId);
+          if (owner) {
+            ownerName = owner.displayName || owner.email?.split('@')[0];
+            ownerEmail = owner.email;
+          }
+        }
+      }
+      
+      // Get participant details
+      const participantDetails = await UserService.getUsersByEmails(trip.participants || []);
+
+      // For debugging
+      console.log('Owner details:', {
+        ownerName,
+        ownerEmail,
+        role,
+        userId: trip.userId,
+        storedUserName: trip.userName,
+        storedUserEmail: trip.userEmail
+      });
+
       res.json({
         success: true,
         trip: {
           id,
           ...trip,
-          role // Include the role in the response
+          role,
+          ownerName: ownerName || 'Unknown',
+          ownerEmail: ownerEmail || 'unknown@email.com',
+          participantDetails
         }
       });
     } catch (error) {
