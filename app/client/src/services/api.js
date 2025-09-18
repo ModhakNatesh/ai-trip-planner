@@ -63,6 +63,14 @@ export const apiService = {
   deleteTrip: (id) => api.delete(`/api/trips/${id}`),
   generateItinerary: (id, preferences) => 
     api.post(`/api/trips/${id}/generate-itinerary`, { preferences }),
+  
+  // Trip participant endpoints
+  addParticipants: (tripId, participants) => 
+    api.post(`/api/trips/${tripId}/participants`, { participants }),
+  removeParticipant: (tripId, email) => 
+    api.delete(`/api/trips/${tripId}/participants/${encodeURIComponent(email)}`),
+  getParticipants: (tripId) => 
+    api.get(`/api/trips/${tripId}/participants`),
 };
 
 export default api;

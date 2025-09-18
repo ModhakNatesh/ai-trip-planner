@@ -62,7 +62,42 @@ export const useTripStore = create(
 
       setError: (error) => set({ error }),
 
-      clearError: () => set({ error: null })
+      clearError: () => set({ error: null }),
+
+      // Participant management
+      addParticipants: (tripId, participants) => set((state) => ({
+        trips: state.trips.map(trip =>
+          trip.id === tripId
+            ? {
+                ...trip,
+                participants: [...(trip.participants || []), ...participants]
+              }
+            : trip
+        ),
+        currentTrip: state.currentTrip?.id === tripId
+          ? {
+              ...state.currentTrip,
+              participants: [...(state.currentTrip.participants || []), ...participants]
+            }
+          : state.currentTrip
+      })),
+
+      removeParticipant: (tripId, email) => set((state) => ({
+        trips: state.trips.map(trip =>
+          trip.id === tripId
+            ? {
+                ...trip,
+                participants: (trip.participants || []).filter(p => p !== email)
+              }
+            : trip
+        ),
+        currentTrip: state.currentTrip?.id === tripId
+          ? {
+              ...state.currentTrip,
+              participants: (state.currentTrip.participants || []).filter(p => p !== email)
+            }
+          : state.currentTrip
+      }))
     }),
     { name: 'trip-store' }
   )
