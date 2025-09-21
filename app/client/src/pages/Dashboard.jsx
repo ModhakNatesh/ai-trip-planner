@@ -19,6 +19,7 @@ const Dashboard = () => {
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [generatingTripId, setGeneratingTripId] = useState(null);
   const [formData, setFormData] = useState({
+    from: '',
     destination: '',
     startDate: '',
     endDate: '',
@@ -87,6 +88,7 @@ const Dashboard = () => {
       setCurrentLocation(location);
       setFormData({
         ...formData,
+        from: location.name,
         currentLocation: location
       });
       
@@ -102,7 +104,7 @@ const Dashboard = () => {
   const handleCreateTrip = async (e) => {
     e.preventDefault();
 
-    if (!formData.destination || !formData.startDate || !formData.endDate) {
+    if (!formData.from || !formData.destination || !formData.startDate || !formData.endDate) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -141,7 +143,7 @@ const Dashboard = () => {
       
       addTrip(tripWithRole);
       toast.success('Trip created successfully!');
-      setFormData({ destination: '', startDate: '', endDate: '', budget: '', numberOfUsers: 1, participants: [], currentLocation: null });
+      setFormData({ from: '', destination: '', startDate: '', endDate: '', budget: '', numberOfUsers: 1, participants: [], currentLocation: null });
       setCurrentLocation(null);
       setShowCreateForm(false);
     } catch (error) {
@@ -173,7 +175,11 @@ const Dashboard = () => {
     try {
       setGeneratingTripId(trip.id);
       toast.loading('🤖 AI is generating your personalized itinerary...', { id: 'generate' });
-      await apiService.generateItinerary(trip.id, {});
+      
+      // Get user preferences
+      const userPreferences = user?.preferences || {};
+      
+      await apiService.generateItinerary(trip.id, userPreferences);
       toast.success('🎉 Itinerary generated successfully!', { id: 'generate' });
       loadTrips(); // Reload to get updated trip
     } catch (error) {
@@ -187,6 +193,7 @@ const Dashboard = () => {
   const handleEditTrip = (trip) => {
     setEditingTrip(trip);
     setFormData({
+      from: trip.from || '',
       destination: trip.destination || '',
       startDate: trip.startDate || '',
       endDate: trip.endDate || '',
@@ -199,8 +206,8 @@ const Dashboard = () => {
 
   const handleUpdateTrip = async () => {
     // Validation
-    if (!formData.destination || !formData.startDate || !formData.endDate) {
-      toast.error('Please fill in all required fields (destination, start date, end date)');
+    if (!formData.from || !formData.destination || !formData.startDate || !formData.endDate) {
+      toast.error('Please fill in all required fields (from, destination, start date, end date)');
       return;
     }
 
@@ -227,7 +234,7 @@ const Dashboard = () => {
     try {
       await apiService.updateTrip(editingTrip.id, formData);
       toast.success('Trip updated successfully!');
-      setFormData({ destination: '', startDate: '', endDate: '', budget: '', numberOfUsers: 1, participants: [], currentLocation: null });
+      setFormData({ from: '', destination: '', startDate: '', endDate: '', budget: '', numberOfUsers: 1, participants: [], currentLocation: null });
       setCurrentLocation(null);
       setShowCreateForm(false);
       setEditingTrip(null);
@@ -247,7 +254,7 @@ const Dashboard = () => {
   const handleCancelEdit = () => {
     setEditingTrip(null);
     setShowCreateForm(false);
-    setFormData({ destination: '', startDate: '', endDate: '', budget: '', numberOfUsers: 1, participants: [], currentLocation: null });
+    setFormData({ from: '', destination: '', startDate: '', endDate: '', budget: '', numberOfUsers: 1, participants: [], currentLocation: null });
     setCurrentLocation(null);
   };
 
@@ -382,17 +389,17 @@ const Dashboard = () => {
                   <form onSubmit={handleFormSubmit} className="space-y-6">
                     <div className="grid md:grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <label htmlFor="destination" className="block text-sm font-semibold text-slate-700">
-                          Destination *
+                        <label htmlFor="from" className="block text-sm font-semibold text-slate-700">
+                          From *
                         </label>
                         <div className="flex gap-2">
                           <Input
-                            id="destination"
-                            name="destination"
+                            id="from"
+                            name="from"
                             type="text"
                             required
-                            placeholder="e.g., Tokyo, Japan"
-                            value={formData.destination}
+                            placeholder="e.g., New York, USA"
+                            value={formData.from}
                             onChange={handleInputChange}
                             className="border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 h-12 flex-1"
                           />
@@ -417,14 +424,29 @@ const Dashboard = () => {
                         )}
                       </div>
                       <div className="space-y-2">
+                        <label htmlFor="destination" className="block text-sm font-semibold text-slate-700">
+                          To (Destination) *
+                        </label>
+                        <Input
+                          id="destination"
+                          name="destination"
+                          type="text"
+                          required
+                          placeholder="e.g., Tokyo, Japan"
+                          value={formData.destination}
+                          onChange={handleInputChange}
+                          className="border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 h-12"
+                        />
+                      </div>
+                      <div className="space-y-2">
                         <label htmlFor="budget" className="block text-sm font-semibold text-slate-700">
-                          Budget (USD)
+                          Budget (INR)
                         </label>
                         <Input
                           id="budget"
                           name="budget"
                           type="number"
-                          placeholder="e.g., 2000"
+                          placeholder="e.g., 150000"
                           value={formData.budget}
                           onChange={handleInputChange}
                           className="border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 h-12"
@@ -616,7 +638,7 @@ const Dashboard = () => {
                             {trip.budget && (
                               <div className="flex items-center text-sm text-slate-600 bg-slate-50 rounded-lg p-3">
                                 <DollarSign className="h-4 w-4 mr-2 text-emerald-500" />
-                                <span className="font-medium">${parseInt(trip.budget).toLocaleString()}</span>
+                                <span className="font-medium">₹{parseInt(trip.budget).toLocaleString()}</span>
                               </div>
                             )}
                             {trip.participants && trip.participants.length > 0 && (

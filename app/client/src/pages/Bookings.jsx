@@ -12,6 +12,7 @@ import {
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { apiService } from '../services/api';
+import { formatCurrency } from '../lib/utils';
 import toast from 'react-hot-toast';
 
 const Bookings = () => {
@@ -56,7 +57,7 @@ const Bookings = () => {
       if (response.data.refundInfo) {
         const { refundAmount, cancellationFeePercentage } = response.data.refundInfo;
         toast.success(
-          `Refund of $${refundAmount} will be processed. Cancellation fee: ${cancellationFeePercentage}%`,
+          `Refund of ₹${refundAmount} will be processed. Cancellation fee: ${cancellationFeePercentage}%`,
           { duration: 6000 }
         );
       }
@@ -77,6 +78,21 @@ const Bookings = () => {
       return <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">Payment Pending</span>;
     }
     return null;
+  };
+
+  // Helper function to get the payment amount
+  const getPaymentAmount = (trip) => {
+    // Use the extracted payment amount if available
+    if (trip?.paymentAmount && trip.paymentAmount > 0) {
+      return trip.paymentAmount;
+    }
+    
+    // Fall back to booking details total cost
+    if (trip?.bookingDetails?.totalCost) {
+      return trip.bookingDetails.totalCost;
+    }
+    
+    return 0;
   };
 
   const formatDate = (dateString) => {
@@ -137,7 +153,7 @@ const Bookings = () => {
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div>
-                    <CardTitle className="flex items-center">
+                    <CardTitle className="flex items-center gap-3">
                       {trip.destination}
                       {getStatusBadge(trip)}
                     </CardTitle>
@@ -147,7 +163,7 @@ const Bookings = () => {
                   </div>
                   <div className="text-right">
                     <p className="text-2xl font-bold text-primary">
-                      ${trip.bookingDetails?.totalCost?.toLocaleString() || 'N/A'}
+                      {formatCurrency(getPaymentAmount(trip)) || 'N/A'}
                     </p>
                     <p className="text-sm text-gray-600">Total Cost</p>
                   </div>
@@ -211,8 +227,8 @@ const Bookings = () => {
                         <p><strong>Days until trip:</strong> {trip.refundInfo.daysUntilTrip}</p>
                       </div>
                       <div>
-                        <p><strong>Cancellation fee:</strong> {trip.refundInfo.cancellationFeePercentage}% (${trip.refundInfo.cancellationFeeAmount})</p>
-                        <p><strong>Refund amount:</strong> ${trip.refundInfo.refundAmount}</p>
+                        <p><strong>Cancellation fee:</strong> {trip.refundInfo.cancellationFeePercentage}% (₹{trip.refundInfo.cancellationFeeAmount})</p>
+                        <p><strong>Refund amount:</strong> ₹{trip.refundInfo.refundAmount}</p>
                       </div>
                     </div>
                   </div>

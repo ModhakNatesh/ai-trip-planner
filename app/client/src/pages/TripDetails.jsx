@@ -25,12 +25,15 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import WeatherCard from '../components/ui/WeatherCard';
+import GoogleMap from '../components/ui/GoogleMap';
 import { apiService } from '../services/api';
+import { useAuthStore } from '../store';
 import toast from 'react-hot-toast';
 
 const TripDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [trip, setTrip] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -75,7 +78,10 @@ const TripDetails = () => {
       setIsGenerating(true);
       toast.loading('🤖 AI is generating your personalized itinerary...', { id: 'generate' });
       
-      const response = await apiService.generateItinerary(trip.id, {});
+      // Get user preferences
+      const userPreferences = user?.preferences || {};
+      
+      const response = await apiService.generateItinerary(trip.id, userPreferences);
       
       if (response.data.success) {
         const message = response.data.message || 'Itinerary generated successfully!';
@@ -199,10 +205,13 @@ const TripDetails = () => {
       setIsRegenerating(true);
       toast.loading('Regenerating itinerary...', { id: 'regenerate' });
       
+      // Get user preferences
+      const userPreferences = user?.preferences || {};
+      
       const excludedPlacesArray = Array.from(excludedPlaces);
       await apiService.regenerateItinerary(trip.id, {
         excludedPlaces: excludedPlacesArray,
-        preferences: {}
+        preferences: userPreferences
       });
       
       toast.success('Itinerary regenerated successfully!', { id: 'regenerate' });
@@ -317,8 +326,12 @@ const TripDetails = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+        <div className="relative">
+          <div className="w-20 h-20 border-4 border-transparent border-t-blue-500 border-r-purple-500 rounded-full animate-spin"></div>
+          <div className="absolute inset-0 w-20 h-20 border-4 border-transparent border-b-pink-500 border-l-cyan-500 rounded-full animate-spin opacity-75" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
+          <RefreshCw className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 text-indigo-600 animate-pulse" />
+        </div>
       </div>
     );
   }
@@ -380,81 +393,99 @@ const TripDetails = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid md:grid-cols-4 gap-6">
-            <div className="flex items-center">
-              <Calendar className="h-5 w-5 mr-3" />
-              <div>
-                <p className="font-medium">{formatDate(trip.startDate)}</p>
-                <p className="text-sm text-blue-200">to {formatDate(trip.endDate)}</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center">
-              <Clock className="h-5 w-5 mr-3" />
-              <div>
-                <p className="font-medium">{formatDateRange(trip.startDate, trip.endDate)}</p>
-                <p className="text-sm text-blue-200">Duration</p>
-              </div>
-            </div>
-            
-            {trip.budget && (
-              <div className="flex items-center">
-                <DollarSign className="h-5 w-5 mr-3" />
-                <div>
-                  <p className="font-medium">${parseInt(trip.budget).toLocaleString()}</p>
-                  <p className="text-sm text-blue-200">Budget</p>
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center">
-              <Users className="h-5 w-5 mr-3" />
-              <div>
-                <p className="font-medium">{(trip.participants?.length || 0) + 1} Participants</p>
-                <p className="text-sm text-blue-200">Trip Members</p>
-              </div>
-            </div>
-          </div>
-          <div className="mt-6 pt-6 border-t border-blue-500/20">
-            <h3 className="text-lg font-medium mb-3">Trip Members</h3>
-            <div className="space-y-2">
-              {/* Always show owner */}
-              <div className="flex items-center justify-between bg-blue-500/10 rounded-lg px-3 py-2">
+          <div className="grid lg:grid-cols-5 gap-6">
+            {/* Trip Details - 65% width (3/5) */}
+            <div className="lg:col-span-3 space-y-6">
+              <div className="grid md:grid-cols-2 gap-6">
                 <div className="flex items-center">
-                  <Users className="h-4 w-4 mr-2" />
-                  <span className="font-medium">{trip.ownerName || trip.ownerEmail || 'Trip Owner'}</span>
-                  {trip.ownerEmail && (
-                    <span className="ml-2 text-sm text-white/70">{trip.ownerEmail}</span>
-                  )}
+                  <Calendar className="h-5 w-5 mr-3" />
+                  <div>
+                    <p className="font-medium">{formatDate(trip.startDate)}</p>
+                    <p className="text-sm text-blue-200">to {formatDate(trip.endDate)}</p>
+                  </div>
                 </div>
-                <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded">Owner</span>
-              </div>
+                
+                <div className="flex items-center">
+                  <Clock className="h-5 w-5 mr-3" />
+                  <div>
+                    <p className="font-medium">{formatDateRange(trip.startDate, trip.endDate)}</p>
+                    <p className="text-sm text-blue-200">Duration</p>
+                  </div>
+                </div>
+                
+                {trip.budget && (
+                  <div className="flex items-center">
+                    <DollarSign className="h-5 w-5 mr-3" />
+                    <div>
+                      <p className="font-medium">₹{parseInt(trip.budget).toLocaleString()}</p>
+                      <p className="text-sm text-blue-200">Budget</p>
+                    </div>
+                  </div>
+                )}
 
-              {/* Show participants */}
-              {trip.participantDetails ? (
-                trip.participantDetails.map((participant) => (
-                  <div key={participant.email} className="flex items-center justify-between bg-blue-500/10 rounded-lg px-3 py-2">
+                <div className="flex items-center">
+                  <Users className="h-5 w-5 mr-3" />
+                  <div>
+                    <p className="font-medium">{(trip.participants?.length || 0) + 1} Participants</p>
+                    <p className="text-sm text-blue-200">Trip Members</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="pt-6 border-t border-blue-500/20">
+                <h3 className="text-lg font-medium mb-3">Trip Members</h3>
+                <div className="space-y-2">
+                  {/* Always show owner */}
+                  <div className="flex items-center justify-between bg-blue-500/10 rounded-lg px-3 py-2">
                     <div className="flex items-center">
                       <Users className="h-4 w-4 mr-2" />
-                      <span className="font-medium">{participant.name}</span>
-                      <span className="ml-2 text-sm text-white/70">{participant.email}</span>
+                      <span className="font-medium">{trip.ownerName || trip.ownerEmail || 'Trip Owner'}</span>
+                      {trip.ownerEmail && (
+                        <span className="ml-2 text-sm text-white/70">{trip.ownerEmail}</span>
+                      )}
                     </div>
-                    <span className="text-xs bg-purple-500 text-white px-2 py-0.5 rounded">Member</span>
+                    <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded">Owner</span>
                   </div>
-                ))
-              ) : trip.participants && trip.participants.length > 0 ? (
-                // Fallback to just emails if no details available
-                trip.participants.map((email) => (
-                  <div key={email} className="flex items-center justify-between bg-blue-500/10 rounded-lg px-3 py-2">
-                    <div className="flex items-center">
-                      <Users className="h-4 w-4 mr-2" />
-                      <span className="font-medium">{email.split('@')[0]}</span>
-                      <span className="ml-2 text-sm text-white/70">{email}</span>
-                    </div>
-                    <span className="text-xs bg-purple-500 text-white px-2 py-0.5 rounded">Member</span>
-                  </div>
-                ))
-              ) : null}
+
+                  {/* Show participants */}
+                  {trip.participantDetails ? (
+                    trip.participantDetails.map((participant) => (
+                      <div key={participant.email} className="flex items-center justify-between bg-blue-500/10 rounded-lg px-3 py-2">
+                        <div className="flex items-center">
+                          <Users className="h-4 w-4 mr-2" />
+                          <span className="font-medium">{participant.name}</span>
+                          <span className="ml-2 text-sm text-white/70">{participant.email}</span>
+                        </div>
+                        <span className="text-xs bg-purple-500 text-white px-2 py-0.5 rounded">Member</span>
+                      </div>
+                    ))
+                  ) : trip.participants && trip.participants.length > 0 ? (
+                    // Fallback to just emails if no details available
+                    trip.participants.map((email) => (
+                      <div key={email} className="flex items-center justify-between bg-blue-500/10 rounded-lg px-3 py-2">
+                        <div className="flex items-center">
+                          <Users className="h-4 w-4 mr-2" />
+                          <span className="font-medium">{email.split('@')[0]}</span>
+                          <span className="ml-2 text-sm text-white/70">{email}</span>
+                        </div>
+                        <span className="text-xs bg-purple-500 text-white px-2 py-0.5 rounded">Member</span>
+                      </div>
+                    ))
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            {/* Map - 35% width (2/5) */}
+            <div className="lg:col-span-2">
+              <GoogleMap 
+                destination={trip.destination}
+                height="400px"
+                zoom={4}
+                showLocationInfo={false}
+                showBoundaries={true}
+                className="w-full h-full rounded-lg overflow-hidden border border-blue-400/30"
+              />
             </div>
           </div>
         </CardContent>
@@ -491,7 +522,7 @@ const TripDetails = () => {
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Budget (Optional)</label>
                   <Input
                     type="number"
-                    placeholder="Budget in USD"
+                    placeholder="Budget in INR"
                     value={editFormData.budget}
                     onChange={(e) => handleEditFormChange('budget', e.target.value)}
                     className="bg-white/50 border-slate-200 focus:border-blue-400 rounded-xl"
@@ -623,7 +654,7 @@ const TripDetails = () => {
                 <WeatherCard weatherInfo={itinerary.weatherInfo} isCompact={true} />
               )}
               
-              <div className="grid md:grid-cols-2 gap-6">
+              <div className="grid md:grid-cols-2 gap-6 mt-6">
                 <div>
                   <h4 className="font-medium mb-2 flex items-center">
                     <Clock className="h-4 w-4 mr-2" />

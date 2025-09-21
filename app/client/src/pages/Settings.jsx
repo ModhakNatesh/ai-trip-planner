@@ -246,11 +246,11 @@ const Settings = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                 >
                   <option value="">Select budget range</option>
-                  <option value="under-500">Under $500</option>
-                  <option value="500-1000">$500 - $1,000</option>
-                  <option value="1000-2500">$1,000 - $2,500</option>
-                  <option value="2500-5000">$2,500 - $5,000</option>
-                  <option value="over-5000">Over $5,000</option>
+                  <option value="under-500">Under ₹40,000</option>
+                  <option value="500-1000">₹40,000 - ₹80,000</option>
+                  <option value="1000-2500">₹80,000 - ₹2,00,000</option>
+                  <option value="2500-5000">₹2,00,000 - ₹4,00,000</option>
+                  <option value="over-5000">Over ₹4,00,000</option>
                 </select>
               </div>
 
