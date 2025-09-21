@@ -7,6 +7,9 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import TripDetails from './pages/TripDetails';
 import Settings from './pages/Settings';
+import Bookings from './pages/Bookings';
+import Payment from './pages/Payment';
+import PaymentSuccess from './pages/PaymentSuccess';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -39,6 +42,30 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <Settings />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/bookings"
+                element={
+                  <ProtectedRoute>
+                    <Bookings />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/payment/:id"
+                element={
+                  <ProtectedRoute>
+                    <Payment />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/payment-success"
+                element={
+                  <ProtectedRoute>
+                    <PaymentSuccess />
                   </ProtectedRoute>
                 }
               />

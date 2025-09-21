@@ -93,6 +93,16 @@ const Layout = ({ children }) => {
                     </Link>
                   )}
 
+                  <Link to="/bookings" className="hidden sm:block">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="rounded-xl bg-white/5 hover:bg-white/10 text-white border border-white/10 hover:border-white/20 transition-all duration-300 font-semibold px-4 sm:px-6 py-2 h-auto backdrop-blur-sm"
+                    >
+                      My Bookings
+                    </Button>
+                  </Link>
+
                   {/* Dynamic Profile Section */}
                   <div className="flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-2 bg-white/10 rounded-xl sm:rounded-2xl border border-white/20 shadow-lg backdrop-blur-sm min-w-0 flex-shrink-0">
                     <img
