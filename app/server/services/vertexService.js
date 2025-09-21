@@ -1,250 +1,373 @@
-// Mock Vertex AI service implementation
-// This can be easily replaced with real Google Cloud Vertex AI integration
+// Google Cloud Vertex AI service implementation
+import { VertexAI } from '@google-cloud/vertexai';
+import admin from '../config/firebase.js';
 
 class VertexAIService {
   constructor() {
     this.isProduction = process.env.NODE_ENV === 'production';
-    this.projectId = process.env.GOOGLE_CLOUD_PROJECT_ID;
+    this.projectId = process.env.FIREBASE_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT_ID;
     this.location = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
-    this.modelId = process.env.VERTEX_AI_MODEL_ID || 'text-bison';
+    this.modelId = process.env.VERTEX_AI_MODEL_ID || 'gemini-2.5-flash';
+    this.vertexAI = null;
+    this.model = null;
+    this.initialized = false;
   }
 
-  // Mock implementation - replace with real Vertex AI calls
-  async callVertexAI(prompt, options = {}) {
+  async initializeVertexAI() {
+    if (this.initialized) return;
+
     try {
-      console.log('🤖 Vertex AI Request:', {
-        prompt: prompt.substring(0, 100) + '...',
-        options
+      if (!admin) {
+        throw new Error('Firebase Admin not initialized');
+      }
+
+      console.log('🔧 Vertex AI Initialization:', {
+        projectId: this.projectId,
+        location: this.location,
+        primaryModel: this.modelId
       });
 
-      // Simulate API delay
-      await this.delay(2000 + Math.random() * 3000);
+      // Initialize Vertex AI using Google Cloud client
+      this.vertexAI = new VertexAI({
+        project: this.projectId,
+        location: this.location,
+      });
 
-      // Mock response based on prompt content
-      const mockResponse = this.generateMockResponse(prompt);
+      // Try multiple models in order of preference
+      const modelsToTry = [
+        this.modelId, // gemini-2.5-flash from env
+        'gemini-1.5-flash',
+        'gemini-1.5-pro',
+        'gemini-pro',
+        'text-bison'
+      ];
 
-      console.log('✅ Vertex AI Response generated');
+      let modelInitialized = false;
       
+      for (const modelName of modelsToTry) {
+        try {
+          console.log(`🔍 Trying model: ${modelName}`);
+          
+          this.model = this.vertexAI.getGenerativeModel({
+            model: modelName, // ✅ Just the model name, no project path
+            generationConfig: {
+              temperature: 0.7,
+              topP: 0.8,
+              topK: 40,
+              maxOutputTokens: 8192, // Increased token limit
+            }
+          });
+          
+          // Test the model with a simple request
+          const testResult = await this.model.generateContent('Hello');
+          const testResponse = testResult.response;
+          
+          // Try to extract text to verify the model works
+          let testText;
+          if (typeof testResponse.text === 'function') {
+            testText = testResponse.text();
+          } else if (testResponse.candidates && testResponse.candidates[0]) {
+            const candidate = testResponse.candidates[0];
+            if (candidate.content.parts && candidate.content.parts[0]) {
+              testText = candidate.content.parts[0].text;
+            }
+          }
+          
+          if (!testText) {
+            throw new Error('Model test failed - no text response');
+          }
+          
+          console.log(`✅ Successfully initialized with model: ${modelName}`);
+          
+          this.modelId = modelName; // Update to the working model
+          modelInitialized = true;
+          break;
+        } catch (error) {
+          console.warn(`⚠️ Model ${modelName} failed:`, error.message.substring(0, 100));
+          continue;
+        }
+      }
+
+      if (!modelInitialized) {
+        throw new Error(`No available Vertex AI models found in region ${this.location}`);
+      }
+
+      this.initialized = true;
+      console.log(`✅ Vertex AI service initialized with model: ${this.modelId}`);
+    } catch (error) {
+      console.error('❌ Failed to initialize Vertex AI:', error.message);
+      this.initialized = false;
+      throw error;
+    }
+  }
+
+  // Real Vertex AI implementation
+  async callVertexAI(requestData, options = {}) {
+    try {
+      await this.initializeVertexAI();
+
+      let prompt;
+      if (typeof requestData === 'string') {
+        prompt = requestData;
+      } else if (requestData.trip) {
+        prompt = this.buildTripPrompt(requestData.trip, requestData.preferences || {});
+      } else {
+        throw new Error('Invalid request data format');
+      }
+
+      console.log('🤖 Vertex AI Request:', {
+        prompt: prompt.substring(0, 200) + '...',
+        model: this.modelId,
+        projectId: this.projectId,
+        location: this.location
+      });
+
+      const result = await this.model.generateContent(prompt);
+      const response = result.response;
+      
+      // Extract text content properly from Vertex AI response
+      let text;
+      if (typeof response.text === 'function') {
+        text = response.text();
+      } else if (response.candidates && response.candidates[0] && response.candidates[0].content) {
+        // Access the content from candidates array
+        const candidate = response.candidates[0];
+        if (candidate.content.parts && candidate.content.parts[0]) {
+          text = candidate.content.parts[0].text;
+        } else {
+          text = candidate.content.text || candidate.content;
+        }
+      } else if (response.text) {
+        text = response.text;
+      } else {
+        console.error('❌ Unexpected response structure:', JSON.stringify(response, null, 2));
+        throw new Error('Unable to extract text from Vertex AI response');
+      }
+
+      console.log('✅ Vertex AI Response received:', {
+        model: this.modelId,
+        responseLength: text ? text.length : 0,
+        success: true,
+        responseStructure: Object.keys(response)
+      });
+
+      // Validate that we have text content
+      if (!text || typeof text !== 'string') {
+        console.error('❌ No valid text content received from Vertex AI');
+        throw new Error('Empty or invalid response from Vertex AI');
+      }
+
+      // Parse the response and structure it properly
+      const itineraryData = this.parseItineraryResponse(text, requestData.trip);
+
       return {
         success: true,
-        data: mockResponse,
+        data: itineraryData,
         usage: {
           promptTokens: Math.floor(prompt.length / 4),
-          completionTokens: Math.floor(mockResponse.length / 4),
-          totalTokens: Math.floor((prompt.length + mockResponse.length) / 4)
+          completionTokens: Math.floor(text.length / 4),
+          totalTokens: Math.floor((prompt.length + text.length) / 4)
         }
       };
     } catch (error) {
-      console.error('❌ Vertex AI Error:', error);
+      console.error('❌ Vertex AI Error:', {
+        message: error.message,
+        model: this.modelId,
+        projectId: this.projectId,
+        location: this.location
+      });
+      
+      // Always return structured fallback data
+      const fallbackData = this.getFallbackResponse(requestData);
+      
       return {
         success: false,
         error: error.message,
-        fallback: this.getFallbackResponse(prompt)
+        data: fallbackData
       };
     }
   }
 
-  generateMockResponse(prompt) {
-    // Parse the prompt to extract trip details
-    const destination = this.extractDestination(prompt);
-    const duration = this.extractDuration(prompt);
-    
-    return this.generateTripItinerary(destination, duration);
-  }
+  buildTripPrompt(trip, preferences = {}) {
+    const { destination, startDate, endDate, budget, participants = [] } = trip;
+    const startDateObj = new Date(startDate);
+    const endDateObj = new Date(endDate);
+    const diffTime = Math.abs(endDateObj - startDateObj);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const numTravelers = (participants.length || 0) + 1;
 
-  extractDestination(prompt) {
-    const match = prompt.match(/trip to ([^from,\n]+)/i);
-    return match ? match[1].trim() : 'your destination';
-  }
+    return `Create a travel itinerary in JSON format for ${destination}, ${diffDays} days, ${numTravelers} traveler(s), budget: ${budget || 'moderate'}.
 
-  extractDuration(prompt) {
-    const startMatch = prompt.match(/from ([\d\w\s,]+) to ([\d\w\s,]+)/i);
-    if (startMatch) {
-      // Calculate days between dates (simplified)
-      return '5-7 days';
+JSON format (be concise):
+{
+  "title": "Trip title",
+  "duration": "${diffDays} Days", 
+  "overview": "Brief overview",
+  "days": [
+    {
+      "day": 1,
+      "title": "Day title",
+      "activities": ["Activity 1", "Activity 2", "Activity 3"],
+      "meals": ["Breakfast suggestion", "Dinner suggestion"],
+      "transportation": "Transport method",
+      "budget": "Daily budget estimate"
     }
-    return '5-7 days';
+  ],
+  "tips": ["Tip 1", "Tip 2", "Tip 3"],
+  "totalEstimatedCost": "Total cost estimate"
+}
+
+Include specific places, restaurants, attractions for ${destination}. Focus on popular attractions and practical details.
+${preferences.excludedPlaces ? `Exclude: ${preferences.excludedPlaces.join(', ')}` : ''}
+
+Return only valid JSON, no extra text.`;
   }
 
-  generateTripItinerary(destination, duration) {
-    const templates = {
-      'Paris': this.getParisItinerary(),
-      'Tokyo': this.getTokyoItinerary(),
-      'New York': this.getNewYorkItinerary(),
-      'London': this.getLondonItinerary(),
-    };
-
-    // Find matching template or use generic
-    const key = Object.keys(templates).find(city => 
-      destination.toLowerCase().includes(city.toLowerCase())
-    );
-
-    return key ? templates[key] : this.getGenericItinerary(destination, duration);
-  }
-
-  getParisItinerary() {
-    return {
-      title: "Magical Paris Adventure",
-      duration: "7 Days",
-      overview: "Experience the romance and culture of Paris with this carefully crafted itinerary featuring iconic landmarks, world-class museums, and authentic local experiences.",
-      days: [
-        {
-          day: 1,
-          title: "Classic Paris Icons",
-          activities: [
-            "Morning: Visit the Eiffel Tower and Trocadéro Gardens",
-            "Afternoon: Seine River cruise",
-            "Evening: Dinner in the Latin Quarter"
-          ],
-          meals: ["Café de Flore for breakfast", "Le Comptoir du Relais for dinner"],
-          transportation: "Metro Day Pass",
-          budget: "$120-150"
-        },
-        {
-          day: 2,
-          title: "Art and Culture",
-          activities: [
-            "Morning: Louvre Museum (pre-book tickets)",
-            "Afternoon: Walk through Tuileries Garden to Place Vendôme",
-            "Evening: Sunset at Sacré-Cœur"
-          ],
-          meals: ["Angelina for hot chocolate", "Le Consulat in Montmartre"],
-          transportation: "Walking + Metro",
-          budget: "$100-130"
-        },
-        {
-          day: 3,
-          title: "Champs-Élysées and Arc de Triomphe",
-          activities: [
-            "Morning: Arc de Triomphe climb",
-            "Afternoon: Shopping on Champs-Élysées",
-            "Evening: Show at Moulin Rouge (optional)"
-          ],
-          meals: ["Ladurée for macarons", "L'Ami Jean for dinner"],
-          transportation: "Metro",
-          budget: "$150-200"
+  parseItineraryResponse(text, trip) {
+    try {
+      console.log('🔍 Parsing response text length:', text.length);
+      
+      // Remove markdown code block markers if present
+      let cleanedText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      
+      // Check if the response was truncated
+      const wasTruncated = !cleanedText.endsWith('}') && !cleanedText.endsWith(']');
+      
+      if (wasTruncated) {
+        console.warn('⚠️ Response appears to be truncated, attempting to fix...');
+        
+        // Try to find a valid ending point for the JSON
+        const lastValidDay = cleanedText.lastIndexOf('},');
+        if (lastValidDay > 0) {
+          // Find the start of the days array
+          const daysStart = cleanedText.indexOf('"days": [');
+          if (daysStart > 0) {
+            // Extract everything up to the last complete day
+            const beforeDays = cleanedText.substring(0, daysStart);
+            const daysSection = cleanedText.substring(daysStart, lastValidDay + 1);
+            
+            // Reconstruct a valid JSON
+            cleanedText = beforeDays + daysSection + '],"tips":["Research local customs and etiquette","Book major attractions in advance","Try local cuisine and specialties"],"totalEstimatedCost":"Contact for detailed pricing"}';
+          }
         }
-      ],
-      tips: [
-        "Book museum tickets in advance to skip lines",
-        "Learn basic French phrases",
-        "Try the metro day passes for easy transportation",
-        "Pack comfortable walking shoes"
-      ],
-      totalEstimatedCost: "$800-1200 per person"
-    };
-  }
+      }
 
-  getTokyoItinerary() {
-    return {
-      title: "Tokyo Modern Meets Traditional",
-      duration: "7 Days",
-      overview: "Discover the fascinating blend of ultra-modern technology and ancient traditions in Japan's vibrant capital city.",
-      days: [
-        {
-          day: 1,
-          title: "Shibuya and Harajuku",
-          activities: [
-            "Morning: Shibuya Crossing experience",
-            "Afternoon: Explore Harajuku and Takeshita Street",
-            "Evening: Observation deck at Tokyo Skytree"
-          ],
-          meals: ["Sushi breakfast at Tsukiji Outer Market", "Ramen in Shibuya"],
-          transportation: "JR Pass",
-          budget: "$80-120"
-        },
-        {
-          day: 2,
-          title: "Traditional Tokyo",
-          activities: [
-            "Morning: Senso-ji Temple in Asakusa",
-            "Afternoon: Traditional gardens in Ueno",
-            "Evening: Kabuki show (optional)"
-          ],
-          meals: ["Traditional breakfast at ryokan", "Tempura dinner"],
-          transportation: "JR Pass + walking",
-          budget: "$90-130"
+      // Try to extract JSON from the response
+      let jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[0]);
+          
+          // Validate the structure
+          if (parsed.days && Array.isArray(parsed.days)) {
+            console.log(`✅ Successfully parsed itinerary with ${parsed.days.length} days`);
+            return parsed;
+          }
+        } catch (parseError) {
+          console.warn('🔧 Initial JSON parse failed, trying to repair...', parseError.message);
+          
+          // Try to repair common JSON issues
+          let repairedJson = jsonMatch[0];
+          
+          // Fix common truncation issues
+          if (!repairedJson.endsWith('}')) {
+            // Try to close unclosed structures
+            const openBraces = (repairedJson.match(/\{/g) || []).length;
+            const closeBraces = (repairedJson.match(/\}/g) || []).length;
+            const openArrays = (repairedJson.match(/\[/g) || []).length;
+            const closeArrays = (repairedJson.match(/\]/g) || []).length;
+            
+            // Add missing closing brackets
+            for (let i = 0; i < openArrays - closeArrays; i++) {
+              repairedJson += ']';
+            }
+            for (let i = 0; i < openBraces - closeBraces; i++) {
+              repairedJson += '}';
+            }
+          }
+          
+          try {
+            const repairedParsed = JSON.parse(repairedJson);
+            if (repairedParsed.days && Array.isArray(repairedParsed.days)) {
+              console.log(`✅ Successfully repaired and parsed itinerary with ${repairedParsed.days.length} days`);
+              return repairedParsed;
+            }
+          } catch (repairError) {
+            console.warn('🔧 JSON repair also failed:', repairError.message);
+          }
         }
-      ],
+      }
+
+      // If parsing fails, return a structured fallback based on the trip
+      console.warn('Failed to parse Vertex AI JSON response, using structured fallback');
+      return this.createStructuredItinerary(trip, text);
+    } catch (error) {
+      console.error('Error parsing Vertex AI response:', error);
+      return this.createStructuredItinerary(trip, text);
+    }
+  }
+
+  createStructuredItinerary(trip, responseText = '') {
+    const { destination, startDate, endDate } = trip;
+    const startDateObj = new Date(startDate);
+    const endDateObj = new Date(endDate);
+    const diffTime = Math.abs(endDateObj - startDateObj);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    // Create a basic structure even if AI response is malformed
+    const days = [];
+    for (let i = 1; i <= Math.min(diffDays, 7); i++) {
+      days.push({
+        day: i,
+        title: `Day ${i} in ${destination}`,
+        activities: [
+          `Explore main attractions in ${destination}`,
+          `Visit local markets and cultural sites`,
+          `Enjoy authentic local cuisine`,
+          `Evening leisure activities`
+        ],
+        meals: [
+          "Local breakfast specialties",
+          "Traditional dinner at recommended restaurant"
+        ],
+        transportation: "Local transport and walking",
+        budget: "$100-150"
+      });
+    }
+
+    return {
+      title: `${destination} Adventure`,
+      duration: `${diffDays} Days`,
+      overview: `A wonderful ${diffDays}-day journey through ${destination}, featuring the best attractions, local experiences, and cultural highlights.`,
+      days: days,
       tips: [
-        "Get a JR Pass for convenient train travel",
-        "Bow when greeting people",
-        "Cash is still king in many places",
-        "Remove shoes when entering homes/temples"
+        `Research local customs and etiquette in ${destination}`,
+        "Book major attractions in advance",
+        "Try local cuisine and specialties",
+        "Keep important documents safe",
+        "Learn basic phrases in the local language"
       ],
-      totalEstimatedCost: "$1000-1500 per person"
+      totalEstimatedCost: `$${500 + (diffDays * 100)}-${800 + (diffDays * 150)} per person`
     };
   }
 
-  getNewYorkItinerary() {
-    return {
-      title: "The Big Apple Experience",
-      duration: "5 Days",
-      overview: "Experience the energy and diversity of New York City with iconic sights, world-class dining, and Broadway shows.",
-      days: [
-        {
-          day: 1,
-          title: "Midtown Manhattan",
-          activities: [
-            "Morning: Empire State Building",
-            "Afternoon: Times Square and Broadway",
-            "Evening: Broadway show"
-          ],
-          meals: ["NY bagel breakfast", "Pizza at Joe's"],
-          transportation: "Metro Card",
-          budget: "$200-300"
-        }
-      ],
-      tips: [
-        "Book Broadway shows in advance",
-        "Use the subway - it's fastest",
-        "Tip 18-20% at restaurants",
-        "Walk in Central Park"
-      ],
-      totalEstimatedCost: "$1200-1800 per person"
-    };
-  }
+  getFallbackResponse(requestData) {
+    const trip = requestData?.trip || requestData;
+    if (trip && trip.destination) {
+      return this.createStructuredItinerary(trip);
+    }
 
-  getLondonItinerary() {
+    // Generic fallback for other cases
     return {
-      title: "London Royal Heritage",
-      duration: "6 Days",
-      overview: "Explore London's rich history, royal heritage, and modern culture in this comprehensive itinerary.",
-      days: [
-        {
-          day: 1,
-          title: "Royal London",
-          activities: [
-            "Morning: Buckingham Palace and Changing of Guard",
-            "Afternoon: Westminster Abbey and Big Ben",
-            "Evening: Thames dinner cruise"
-          ],
-          meals: ["Traditional English breakfast", "Fish and chips"],
-          transportation: "Oyster Card",
-          budget: "$150-200"
-        }
-      ],
-      tips: [
-        "Get an Oyster Card for transport",
-        "Many museums are free",
-        "Book afternoon tea in advance",
-        "Mind the gap!"
-      ],
-      totalEstimatedCost: "$900-1400 per person"
-    };
-  }
-
-  getGenericItinerary(destination, duration) {
-    return {
-      title: `Discover ${destination}`,
-      duration: duration,
-      overview: `A carefully planned itinerary to explore the best of ${destination}, featuring local attractions, cultural experiences, and authentic cuisine.`,
+      title: "Trip Planning Assistant",
+      duration: "5-7 Days",
+      overview: "I'm currently experiencing technical difficulties, but I'd be happy to help you plan your trip! Here are some general suggestions:",
       days: [
         {
           day: 1,
           title: "Arrival and Orientation",
           activities: [
-            `Arrive in ${destination}`,
+            "Arrive at destination",
             "Check into accommodation",
             "Explore the main city center",
             "Welcome dinner at a local restaurant"
@@ -252,51 +375,9 @@ class VertexAIService {
           meals: ["Local breakfast specialty", "Traditional dinner"],
           transportation: "Airport transfer + local transport",
           budget: "$100-150"
-        },
-        {
-          day: 2,
-          title: "Main Attractions",
-          activities: [
-            "Visit top-rated tourist attractions",
-            "Guided city tour",
-            "Local market exploration",
-            "Cultural performance or museum"
-          ],
-          meals: ["Street food lunch", "Restaurant dinner"],
-          transportation: "Public transport day pass",
-          budget: "$120-180"
-        },
-        {
-          day: 3,
-          title: "Local Experiences",
-          activities: [
-            "Participate in local activities",
-            "Visit neighborhoods off the beaten path",
-            "Cooking class or cultural workshop",
-            "Sunset viewing at scenic spot"
-          ],
-          meals: ["Cooking class meal", "Local specialties"],
-          transportation: "Walking + public transport",
-          budget: "$90-140"
         }
       ],
       tips: [
-        "Research local customs and etiquette",
-        "Learn basic phrases in the local language",
-        "Keep important documents safe",
-        "Try local cuisine and specialties",
-        "Respect local traditions and dress codes"
-      ],
-      totalEstimatedCost: "$800-1500 per person"
-    };
-  }
-
-  // eslint-disable-next-line no-unused-vars
-  getFallbackResponse(_prompt) {
-    return {
-      title: "Trip Planning Assistant",
-      message: "I'm currently experiencing technical difficulties, but I'd be happy to help you plan your trip! Here are some general suggestions:",
-      suggestions: [
         "Research your destination's climate and pack accordingly",
         "Book accommodations and flights well in advance",
         "Check visa requirements and travel documents",
@@ -305,6 +386,7 @@ class VertexAIService {
         "Learn basic phrases in the local language",
         "Research local customs and etiquette"
       ],
+      totalEstimatedCost: "$800-1500 per person",
       note: "For a detailed, personalized itinerary, please try again later when our AI service is fully operational."
     };
   }
@@ -312,73 +394,17 @@ class VertexAIService {
   delay(ms) {
     return new Promise(resolve => global.setTimeout(resolve, ms));
   }
-
-  // Method to switch to real Vertex AI implementation
-  async initializeRealVertexAI() {
-    if (!this.isProduction) {
-      console.log('⚠️  Using mock Vertex AI service in development mode');
-      return;
-    }
-
-    try {
-      // Uncomment and configure when ready to use real Vertex AI
-      /*
-      const { VertexAI } = require('@google-cloud/aiplatform');
-      
-      this.vertexAI = new VertexAI({
-        project: this.projectId,
-        location: this.location,
-      });
-
-      this.model = this.vertexAI.preview.getGenerativeModel({
-        model: this.modelId,
-      });
-
-      console.log('✅ Real Vertex AI service initialized');
-      */
-      
-      console.log('📝 Real Vertex AI integration ready for configuration');
-    } catch (error) {
-      console.error('❌ Failed to initialize real Vertex AI:', error);
-      throw error;
-    }
-  }
-
-  // Real Vertex AI implementation (commented out for development)
-  /*
-  async callRealVertexAI(prompt, options = {}) {
-    if (!this.model) {
-      throw new Error('Vertex AI not initialized');
-    }
-
-    const request = {
-      contents: [{
-        role: 'user',
-        parts: [{ text: prompt }]
-      }],
-      generationConfig: {
-        maxOutputTokens: options.maxTokens || 2048,
-        temperature: options.temperature || 0.7,
-        topP: options.topP || 0.8,
-        topK: options.topK || 40,
-      },
-    };
-
-    const response = await this.model.generateContent(request);
-    return response.response.candidates[0].content.parts[0].text;
-  }
-  */
 }
 
 // Export singleton instance
 const vertexService = new VertexAIService();
 
-export const callVertexAI = (prompt, options) => {
-  return vertexService.callVertexAI(prompt, options);
+export const callVertexAI = (requestData, options) => {
+  return vertexService.callVertexAI(requestData, options);
 };
 
 export const initializeVertexAI = () => {
-  return vertexService.initializeRealVertexAI();
+  return vertexService.initializeVertexAI();
 };
 
 export default vertexService;

@@ -1,6 +1,6 @@
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { getDatabase } from 'firebase-admin/database'; // Changed from firestore
+import { getDatabase } from 'firebase-admin/database';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -50,6 +50,6 @@ try {
 
 // Export Firebase services
 export const auth = admin ? getAuth(admin) : null;
-export const db = admin ? getDatabase(admin) : null; // Changed from getFirestore
+export const db = admin ? getDatabase(admin) : null;
 
 export default admin;

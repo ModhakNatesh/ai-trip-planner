@@ -388,18 +388,12 @@ export class TripController {
 
       console.log('📝 Vertex AI response:', {
         success: response.success,
-        fallback: response.fallback,
         hasData: !!response.data,
         dataStructure: response.data ? Object.keys(response.data) : null
       });
 
-      if (!response.success && !response.fallback) {
-        console.error('❌ Vertex AI failed completely:', response.error);
-        return res.status(500).json({
-          success: false,
-          error: 'Failed to generate itinerary',
-          details: response.error
-        });
+      if (!response.success) {
+        console.warn('⚠️ Vertex AI failed, using fallback response');
       }
 
       const itinerary = response.data;
@@ -432,7 +426,9 @@ export class TripController {
           itinerary,
           status: 'planned'
         },
-        message: response.fallback ? 'Itinerary generated using fallback content' : 'Itinerary generated successfully'
+        message: response.success ? 
+          'Itinerary generated successfully using AI!' : 
+          'Itinerary generated using smart fallback content'
       };
 
       // Log response size for debugging
@@ -827,11 +823,7 @@ export class TripController {
       });
 
       if (!response.success) {
-        return res.status(500).json({
-          success: false,
-          error: 'Failed to regenerate itinerary',
-          details: response.error
-        });
+        console.warn('⚠️ Vertex AI failed during regeneration, using fallback');
       }
 
       const itinerary = response.data;
