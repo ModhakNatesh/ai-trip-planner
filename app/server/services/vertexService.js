@@ -269,19 +269,63 @@ Consider the weather when suggesting activities (indoor alternatives for rainy d
       }
     }
 
+    // Add user preferences context if available
+    let preferencesContext = '';
+    if (preferences && Object.keys(preferences).length > 0) {
+      let prefParts = [];
+      
+      if (preferences.budget) {
+        const budgetMapping = {
+          'under-500': 'Budget-conscious (Under ₹40,000)',
+          '500-1000': 'Mid-range (₹40,000 - ₹80,000)', 
+          '1000-2500': 'Comfortable (₹80,000 - ₹2,00,000)',
+          '2500-5000': 'Premium (₹2,00,000 - ₹4,00,000)',
+          'over-5000': 'Luxury (Over ₹4,00,000)'
+        };
+        prefParts.push(`Budget preference: ${budgetMapping[preferences.budget] || preferences.budget}`);
+      }
+      
+      if (preferences.travelStyle) {
+        const styleMapping = {
+          'budget': 'Budget traveler - focus on affordable options and value for money',
+          'mid-range': 'Mid-range traveler - balance of comfort and cost',
+          'luxury': 'Luxury traveler - premium experiences and comfort',
+          'backpacking': 'Backpacker - adventurous, flexible, budget-friendly',
+          'family': 'Family-friendly - activities suitable for all ages',
+          'solo': 'Solo traveler - safe, social, and flexible options'
+        };
+        prefParts.push(`Travel style: ${styleMapping[preferences.travelStyle] || preferences.travelStyle}`);
+      }
+      
+      if (preferences.interests && Array.isArray(preferences.interests) && preferences.interests.length > 0) {
+        prefParts.push(`Interests: ${preferences.interests.join(', ')}`);
+      }
+      
+      if (prefParts.length > 0) {
+        preferencesContext = `
+User Preferences:
+${prefParts.map(p => `- ${p}`).join('\n')}
+
+Please tailor the itinerary to match these preferences and interests.`;
+      }
+    }
+
     return `Create a travel itinerary in JSON format for ${destination}, ${diffDays} days, ${numTravelers} traveler(s), budget: ${budget || 'moderate'}.
 
 Group Size: ${numTravelers} ${numTravelers === 1 ? 'solo traveler' : numTravelers === 2 ? 'couple' : `group of ${numTravelers} people`}
 ${locationContext}
 ${weatherContext}
+${preferencesContext}
 
 IMPORTANT: 
 - Use plain text only. Do not use markdown formatting (**bold**, *italics*) or special characters. Write in clean, readable plain text.
+- All budget and cost estimates should be in Indian Rupees (INR) using ₹ symbol.
 - Consider the group size of ${numTravelers} people when recommending activities, accommodations, and transportation.
 - ${numTravelers === 1 ? 'Focus on solo-friendly activities and single occupancy options.' : 
    numTravelers === 2 ? 'Recommend romantic/couple activities and double occupancy accommodations.' : 
    `Plan group activities suitable for ${numTravelers} people and recommend group accommodations/transportation.`}
 ${weather ? '- Factor in the weather forecast when suggesting activities and include weather-appropriate clothing recommendations.' : ''}
+${preferencesContext ? '- Tailor all recommendations to match the user\'s specified preferences, travel style, and interests.' : ''}
 
 JSON format (be concise):
 {
@@ -295,17 +339,19 @@ JSON format (be concise):
       "activities": ["Activity 1 description in plain text", "Activity 2 description in plain text", "Activity 3 description in plain text"],
       "meals": ["Breakfast suggestion in plain text", "Dinner suggestion in plain text"],
       "transportation": "Transport method in plain text",
-      "budget": "Daily budget estimate"
+      "budget": "Daily budget estimate in INR with ₹ symbol"
     }
   ],
   "tips": ["Tip 1 in plain text without markdown", "Tip 2 in plain text without markdown", "Tip 3 in plain text without markdown"${weather ? ', "Weather-appropriate clothing and packing suggestions based on forecast"' : ''}],
-  "totalEstimatedCost": "Total cost estimate"${weather ? ',\n  "weatherInfo": {\n    "forecast": "Brief weather summary for trip dates",\n    "packingRecommendations": ["Essential items for the weather conditions"]\n  }' : ''}
+  "totalEstimatedCost": "Total cost estimate in INR with ₹ symbol"${weather ? ',\n  "weatherInfo": {\n    "forecast": "Brief weather summary for trip dates",\n    "packingRecommendations": ["Essential items for the weather conditions"]\n  }' : ''}
 }
 
 Include specific places, restaurants, attractions for ${destination}. Focus on popular attractions and practical details.
 Use plain text descriptions without any markdown formatting like asterisks or bold text.
 Consider group size of ${numTravelers} ${numTravelers === 1 ? 'solo traveler' : 'travelers'} for all recommendations (activities, restaurants, accommodations).
+All budget estimates and costs should be in Indian Rupees (INR) with proper ₹ symbol formatting.
 ${weather ? 'Include indoor and outdoor activity options based on the weather forecast. Suggest appropriate clothing and gear in the tips section.' : ''}
+${preferencesContext ? 'Ensure all activities, accommodations, and recommendations align with the user\'s stated preferences and interests.' : ''}
 ${preferences.excludedPlaces ? `Exclude: ${preferences.excludedPlaces.join(', ')}` : ''}
 ${currentLocation ? `Consider transportation from ${currentLocation.name} and include travel recommendations.` : ''}
 
@@ -424,7 +470,7 @@ Return only valid JSON with plain text content, no markdown formatting, no extra
           "Traditional dinner at recommended restaurant"
         ],
         transportation: "Local transport and walking",
-        budget: "$100-150"
+        budget: "₹8,000-12,000"
       });
     }
 
@@ -440,7 +486,7 @@ Return only valid JSON with plain text content, no markdown formatting, no extra
         "Keep important documents safe",
         "Learn basic phrases in the local language"
       ],
-      totalEstimatedCost: `$${500 + (diffDays * 100)}-${800 + (diffDays * 150)} per person`
+      totalEstimatedCost: `₹${40000 + (diffDays * 8000)}-${65000 + (diffDays * 12000)} per person`
     };
   }
 
@@ -467,7 +513,7 @@ Return only valid JSON with plain text content, no markdown formatting, no extra
           ],
           meals: ["Local breakfast specialty", "Traditional dinner"],
           transportation: "Airport transfer + local transport",
-          budget: "$100-150"
+          budget: "₹8,000-12,000"
         }
       ],
       tips: [
@@ -479,7 +525,7 @@ Return only valid JSON with plain text content, no markdown formatting, no extra
         "Learn basic phrases in the local language",
         "Research local customs and etiquette"
       ],
-      totalEstimatedCost: "$800-1500 per person",
+      totalEstimatedCost: "₹65,000-1,25,000 per person",
       note: "For a detailed, personalized itinerary, please try again later when our AI service is fully operational."
     };
   }

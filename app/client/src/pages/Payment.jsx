@@ -12,6 +12,7 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { apiService } from '../services/api';
+import { formatCurrency } from '../lib/utils';
 import toast from 'react-hot-toast';
 
 const Payment = () => {
@@ -26,6 +27,29 @@ const Payment = () => {
     cvv: '',
     nameOnCard: ''
   });
+
+  // Helper function to get the payment amount
+  const getPaymentAmount = () => {
+    // Use the extracted payment amount if available
+    if (trip?.paymentAmount && trip.paymentAmount > 0) {
+      return trip.paymentAmount;
+    }
+    
+    // Fall back to booking details total cost
+    if (trip?.bookingDetails?.totalCost) {
+      return trip.bookingDetails.totalCost;
+    }
+    
+    // Last resort - try to extract from AI text (shouldn't happen with new implementation)
+    if (trip?.itinerary?.totalEstimatedCost) {
+      const match = trip.itinerary.totalEstimatedCost.match(/₹?[\d,]+/);
+      if (match) {
+        return parseInt(match[0].replace(/[₹,]/g, ''));
+      }
+    }
+    
+    return 0;
+  };
 
   const loadTripDetails = useCallback(async () => {
     try {
@@ -194,7 +218,7 @@ const Payment = () => {
                 <div className="flex justify-between text-lg font-bold pt-2 border-t">
                   <span>Total Amount</span>
                   <span className="text-primary">
-                    ${trip.bookingDetails.totalCost?.toLocaleString()}
+                    {formatCurrency(getPaymentAmount())}
                   </span>
                 </div>
               </div>
@@ -293,7 +317,7 @@ const Payment = () => {
                 ) : (
                   <>
                     <Lock className="h-4 w-4 mr-2" />
-                    Pay ${trip.bookingDetails?.totalCost?.toLocaleString() || '0'}
+                    Pay {formatCurrency(getPaymentAmount())}
                   </>
                 )}
               </Button>
