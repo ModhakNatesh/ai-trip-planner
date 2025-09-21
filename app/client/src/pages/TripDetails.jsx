@@ -27,11 +27,13 @@ import { Input } from '../components/ui/input';
 import WeatherCard from '../components/ui/WeatherCard';
 import GoogleMap from '../components/ui/GoogleMap';
 import { apiService } from '../services/api';
+import { useAuthStore } from '../store';
 import toast from 'react-hot-toast';
 
 const TripDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [trip, setTrip] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -76,7 +78,10 @@ const TripDetails = () => {
       setIsGenerating(true);
       toast.loading('🤖 AI is generating your personalized itinerary...', { id: 'generate' });
       
-      const response = await apiService.generateItinerary(trip.id, {});
+      // Get user preferences
+      const userPreferences = user?.preferences || {};
+      
+      const response = await apiService.generateItinerary(trip.id, userPreferences);
       
       if (response.data.success) {
         const message = response.data.message || 'Itinerary generated successfully!';
@@ -200,10 +205,13 @@ const TripDetails = () => {
       setIsRegenerating(true);
       toast.loading('Regenerating itinerary...', { id: 'regenerate' });
       
+      // Get user preferences
+      const userPreferences = user?.preferences || {};
+      
       const excludedPlacesArray = Array.from(excludedPlaces);
       await apiService.regenerateItinerary(trip.id, {
         excludedPlaces: excludedPlacesArray,
-        preferences: {}
+        preferences: userPreferences
       });
       
       toast.success('Itinerary regenerated successfully!', { id: 'regenerate' });
@@ -318,8 +326,12 @@ const TripDetails = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+        <div className="relative">
+          <div className="w-20 h-20 border-4 border-transparent border-t-blue-500 border-r-purple-500 rounded-full animate-spin"></div>
+          <div className="absolute inset-0 w-20 h-20 border-4 border-transparent border-b-pink-500 border-l-cyan-500 rounded-full animate-spin opacity-75" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
+          <RefreshCw className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 text-indigo-600 animate-pulse" />
+        </div>
       </div>
     );
   }
@@ -405,7 +417,7 @@ const TripDetails = () => {
                   <div className="flex items-center">
                     <DollarSign className="h-5 w-5 mr-3" />
                     <div>
-                      <p className="font-medium">${parseInt(trip.budget).toLocaleString()}</p>
+                      <p className="font-medium">₹{parseInt(trip.budget).toLocaleString()}</p>
                       <p className="text-sm text-blue-200">Budget</p>
                     </div>
                   </div>
@@ -510,7 +522,7 @@ const TripDetails = () => {
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Budget (Optional)</label>
                   <Input
                     type="number"
-                    placeholder="Budget in USD"
+                    placeholder="Budget in INR"
                     value={editFormData.budget}
                     onChange={(e) => handleEditFormChange('budget', e.target.value)}
                     className="bg-white/50 border-slate-200 focus:border-blue-400 rounded-xl"

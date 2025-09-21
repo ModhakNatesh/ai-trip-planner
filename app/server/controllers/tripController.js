@@ -3,6 +3,39 @@ import { callVertexAI } from '../services/vertexService.js';
 import { UserService } from '../services/userService.js';
 import weatherService from '../services/weatherService.js';
 
+/**
+ * Extracts a clean numeric payment amount from AI-generated cost text
+ */
+function extractPaymentAmount(costText) {
+  if (!costText || typeof costText !== 'string') {
+    return 0;
+  }
+
+  // Remove currency symbol and commas, extract numbers
+  const numbers = costText.match(/₹?[\d,]+/g);
+  
+  if (!numbers || numbers.length === 0) {
+    return 0;
+  }
+
+  // Convert to actual numbers
+  const amounts = numbers.map(num => {
+    return parseInt(num.replace(/[₹,]/g, ''));
+  }).filter(num => !isNaN(num) && num > 0);
+
+  if (amounts.length === 0) {
+    return 0;
+  }
+
+  // If we have a range (like ₹135,000 - ₹150,000), take the average
+  if (amounts.length >= 2) {
+    return Math.round((amounts[0] + amounts[1]) / 2);
+  }
+
+  // Otherwise return the single amount
+  return amounts[0];
+}
+
 export class TripController {
   static async getUserTrips(req, res) {
     try {
@@ -438,9 +471,14 @@ export class TripController {
 
       console.log('✅ Valid itinerary generated, updating trip...');
 
-      // Update trip with generated itinerary
+      // Extract clean payment amount from the AI cost text
+      const paymentAmount = extractPaymentAmount(itinerary.totalEstimatedCost);
+      console.log('💰 Extracted payment amount:', paymentAmount, 'from:', itinerary.totalEstimatedCost);
+
+      // Update trip with generated itinerary and payment amount
       await tripRef.update({
         itinerary,
+        paymentAmount, // Store the clean numeric amount for payments
         status: 'planned',
         updatedAt: new Date().toISOString()
       });
@@ -453,6 +491,7 @@ export class TripController {
           id,
           ...trip,
           itinerary,
+          paymentAmount, // Include the clean payment amount
           status: 'planned'
         },
         message: response.success ? 
@@ -871,9 +910,14 @@ export class TripController {
 
       const itinerary = response.data;
 
+      // Extract clean payment amount from the AI cost text
+      const paymentAmount = extractPaymentAmount(itinerary.totalEstimatedCost);
+      console.log('💰 Extracted payment amount during regeneration:', paymentAmount, 'from:', itinerary.totalEstimatedCost);
+
       // Reset booking status if itinerary changes after booking
       const updateData = {
         itinerary,
+        paymentAmount, // Store the clean numeric amount for payments
         status: 'planned',
         updatedAt: new Date().toISOString()
       };

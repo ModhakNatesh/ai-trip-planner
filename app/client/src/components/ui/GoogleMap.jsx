@@ -196,7 +196,6 @@ const GoogleMap = ({
                 const bounds = place.geometry.viewport;
                 const center = bounds.getCenter();
                 const ne = bounds.getNorthEast();
-                const sw = bounds.getSouthWest();
                 
                 // Calculate approximate radius for the area
                 const radius = window.google.maps.geometry.spherical.computeDistanceBetween(center, ne);
@@ -264,7 +263,7 @@ const GoogleMap = ({
         markerRef.current.setMap(null);
       }
     };
-  }, [destination, zoom]);
+  }, [destination, zoom, showBoundaries]);
 
   if (!destination) {
     return (

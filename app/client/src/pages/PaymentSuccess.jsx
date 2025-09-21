@@ -11,11 +11,27 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { formatCurrency } from '../lib/utils';
 
 const PaymentSuccess = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { trip, paymentId } = location.state || {};
+
+  // Helper function to get the payment amount
+  const getPaymentAmount = () => {
+    // Use the extracted payment amount if available
+    if (trip?.paymentAmount && trip.paymentAmount > 0) {
+      return trip.paymentAmount;
+    }
+    
+    // Fall back to booking details total cost
+    if (trip?.bookingDetails?.totalCost) {
+      return trip.bookingDetails.totalCost;
+    }
+    
+    return 0;
+  };
 
   useEffect(() => {
     // If no trip data, redirect to dashboard
@@ -79,7 +95,7 @@ const PaymentSuccess = () => {
             <div className="pt-4 border-t">
               <p className="text-sm text-gray-600 mb-1">Total Paid</p>
               <p className="text-2xl font-bold text-green-600">
-                ${trip.bookingDetails?.totalCost?.toLocaleString()}
+                {formatCurrency(getPaymentAmount())}
               </p>
             </div>
           </CardContent>

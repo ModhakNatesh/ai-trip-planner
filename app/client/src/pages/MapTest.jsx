@@ -2,7 +2,6 @@
  * Test component to verify Google Maps integration
  * This can be used in development to test the map functionality
  */
-import React from 'react';
 import GoogleMap from '../components/ui/GoogleMap';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 
