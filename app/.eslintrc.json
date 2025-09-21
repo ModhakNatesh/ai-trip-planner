@@ -1,0 +1,51 @@
+{
+  "env": {
+    "browser": true,
+    "node": true,
+    "es2020": true
+  },
+  "extends": [
+    "eslint:recommended"
+  ],
+  "parserOptions": {
+    "ecmaVersion": "latest",
+    "sourceType": "module"
+  },
+  "overrides": [
+    {
+      "files": ["client/**/*.{js,jsx}"],
+      "env": {
+        "browser": true
+      },
+      "extends": [
+        "eslint:recommended",
+        "plugin:react/recommended",
+        "plugin:react/jsx-runtime",
+        "plugin:react-hooks/recommended"
+      ],
+      "settings": {
+        "react": {
+          "version": "18.2"
+        }
+      },
+      "rules": {
+        "react/prop-types": "off"
+      }
+    },
+    {
+      "files": ["server/**/*.js"],
+      "env": {
+        "node": true
+      },
+      "extends": [
+        "eslint:recommended"
+      ]
+    }
+  ],
+  "ignorePatterns": [
+    "node_modules",
+    "dist",
+    "build",
+    "coverage"
+  ]
+}
