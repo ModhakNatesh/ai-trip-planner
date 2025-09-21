@@ -1,4 +1,3 @@
-import React from 'react';
 import { Cloud, CloudRain, Sun, Snowflake, Wind, Thermometer, Droplets } from 'lucide-react';
 
 const WeatherIcon = ({ condition, className = "w-4 h-4" }) => {
