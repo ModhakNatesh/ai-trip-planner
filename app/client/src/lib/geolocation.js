@@ -77,15 +77,11 @@ export const getLocationName = async (latitude, longitude) => {
 };
 
 export const getUserLocation = async () => {
-  try {
-    const coords = await getCurrentLocation();
-    const locationName = await getLocationName(coords.latitude, coords.longitude);
-    
-    return {
-      ...coords,
-      name: locationName
-    };
-  } catch (error) {
-    throw error;
-  }
+  const coords = await getCurrentLocation();
+  const locationName = await getLocationName(coords.latitude, coords.longitude);
+  
+  return {
+    ...coords,
+    name: locationName
+  };
 };

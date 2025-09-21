@@ -102,7 +102,7 @@ class VertexAIService {
   }
 
   // Real Vertex AI implementation
-  async callVertexAI(requestData, options = {}) {
+  async callVertexAI(requestData) {
     try {
       await this.initializeVertexAI();
 
@@ -330,7 +330,7 @@ Return only valid JSON with plain text content, no markdown formatting, no extra
     }
   }
 
-  createStructuredItinerary(trip, responseText = '') {
+  createStructuredItinerary(trip) {
     const { destination, startDate, endDate } = trip;
     const startDateObj = new Date(startDate);
     const endDateObj = new Date(endDate);
@@ -459,8 +459,8 @@ Return only valid JSON with plain text content, no markdown formatting, no extra
 // Export singleton instance
 const vertexService = new VertexAIService();
 
-export const callVertexAI = (requestData, options) => {
-  return vertexService.callVertexAI(requestData, options);
+export const callVertexAI = (requestData) => {
+  return vertexService.callVertexAI(requestData);
 };
 
 export const initializeVertexAI = () => {
