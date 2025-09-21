@@ -18,7 +18,8 @@ import {
   AlertTriangle,
   RefreshCw,
   Eye,
-  EyeOff
+  EyeOff,
+  Share2
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -195,6 +196,35 @@ const TripDetails = () => {
       console.error('Regenerate itinerary error:', error);
     } finally {
       setIsRegenerating(false);
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      const shareUrl = `${window.location.origin}/trip/${trip.id}`;
+      const shareTitle = `Check out my ${trip.destination} trip!`;
+      const shareText = `I'm planning an amazing ${formatDateRange(trip.startDate, trip.endDate)} trip to ${trip.destination}. Want to see the itinerary?`;
+      
+      // Check if Web Share API is supported
+      if (navigator.share) {
+        await navigator.share({
+          title: shareTitle,
+          text: shareText,
+          url: shareUrl
+        });
+        toast.success('Trip shared successfully!');
+      } else {
+        // Fallback to clipboard copy
+        const shareContent = `${shareTitle}\n\n${shareText}\n\n${shareUrl}`;
+        await navigator.clipboard.writeText(shareContent);
+        toast.success('Trip link copied to clipboard!');
+      }
+    } catch (error) {
+      // Handle user cancellation or other errors
+      if (error.name !== 'AbortError') {
+        console.error('Share error:', error);
+        toast.error('Failed to share trip');
+      }
     }
   };
 
@@ -837,7 +867,12 @@ const TripDetails = () => {
             )}
 
             {/* Share Trip Button */}
-            <Button variant="outline" className="text-blue-600 hover:text-blue-700">
+            <Button 
+              variant="outline" 
+              className="text-blue-600 hover:text-blue-700"
+              onClick={handleShare}
+            >
+              <Share2 className="h-4 w-4 mr-2" />
               Share Trip
             </Button>
 
