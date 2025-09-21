@@ -24,6 +24,7 @@ import {
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
+import WeatherCard from '../components/ui/WeatherCard';
 import { apiService } from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -616,6 +617,11 @@ const TripDetails = () => {
             </CardHeader>
             <CardContent>
               <p className="text-gray-700 mb-4">{itinerary.overview}</p>
+              
+              {/* Weather Information */}
+              {itinerary.weatherInfo && (
+                <WeatherCard weatherInfo={itinerary.weatherInfo} isCompact={true} />
+              )}
               
               <div className="grid md:grid-cols-2 gap-6">
                 <div>

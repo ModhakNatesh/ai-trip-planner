@@ -110,19 +110,52 @@ class VertexAIService {
       if (typeof requestData === 'string') {
         prompt = requestData;
       } else if (requestData.trip) {
-        prompt = this.buildTripPrompt(requestData.trip, requestData.preferences || {});
+        prompt = this.buildTripPrompt(requestData.trip, requestData.preferences || {}, requestData.weather);
       } else {
         throw new Error('Invalid request data format');
       }
 
       console.log('🤖 Vertex AI Request:', {
         prompt: prompt.substring(0, 200) + '...',
+        promptLength: prompt.length,
+        hasWeatherData: !!requestData.weather,
+        weatherForecastLength: requestData.weather?.forecast?.length || 0,
         model: this.modelId,
         projectId: this.projectId,
         location: this.location
       });
 
-      const result = await this.model.generateContent(prompt);
+      // Validate prompt length (max ~30k characters to be safe)
+      if (prompt.length > 30000) {
+        console.warn('⚠️ Prompt is very long:', prompt.length, 'characters');
+      }
+
+      // Add retry logic for better reliability
+      let result;
+      let lastError;
+      const maxRetries = 2;
+      
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`🔄 Attempt ${attempt}/${maxRetries} for Vertex AI call`);
+          result = await this.model.generateContent(prompt);
+          break; // Success, exit retry loop
+        } catch (error) {
+          lastError = error;
+          console.warn(`⚠️ Attempt ${attempt} failed:`, error.message);
+          
+          if (attempt < maxRetries) {
+            // Wait before retry (exponential backoff)
+            const waitTime = Math.pow(2, attempt - 1) * 1000; // 1s, 2s
+            console.log(`⏳ Waiting ${waitTime}ms before retry...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+          }
+        }
+      }
+      
+      if (!result) {
+        throw lastError || new Error('All retry attempts failed');
+      }
       const response = result.response;
       
       // Extract text content properly from Vertex AI response
@@ -172,9 +205,15 @@ class VertexAIService {
     } catch (error) {
       console.error('❌ Vertex AI Error:', {
         message: error.message,
+        code: error.code,
+        status: error.status,
+        details: error.details,
+        stack: error.stack?.split('\n').slice(0, 3).join('\n'), // First 3 lines of stack
         model: this.modelId,
         projectId: this.projectId,
-        location: this.location
+        location: this.location,
+        hasWeatherData: !!requestData.weather,
+        promptLength: requestData.trip ? 'estimated' : 'unknown'
       });
       
       // Always return structured fallback data
@@ -188,7 +227,7 @@ class VertexAIService {
     }
   }
 
-  buildTripPrompt(trip, preferences = {}) {
+  buildTripPrompt(trip, preferences = {}, weather = null) {
     const { destination, startDate, endDate, budget, participants = [], currentLocation, numberOfUsers } = trip;
     const startDateObj = new Date(startDate);
     const endDateObj = new Date(endDate);
@@ -202,10 +241,39 @@ class VertexAIService {
       `Starting from: ${currentLocation.name} (${currentLocation.latitude}, ${currentLocation.longitude}). Consider travel time and transportation options from this location to ${destination}.` : 
       '';
 
+    // Add weather context if available
+    let weatherContext = '';
+    if (weather && weather.forecast && Array.isArray(weather.forecast) && weather.forecast.length > 0) {
+      try {
+        const avgTemp = weather.forecast.reduce((sum, day) => sum + (day.temperature || 0), 0) / weather.forecast.length;
+        const rainDays = weather.forecast.filter(day => (day.precipitation || 0) > 0).length;
+        const weatherConditions = [...new Set(weather.forecast.map(day => day.condition || 'unknown'))].join(', ');
+        
+        const clothingRecs = weather.recommendations?.clothing?.length > 0 ? 
+          weather.recommendations.clothing.join(', ') : 'Standard travel clothing';
+        const accessoryRecs = weather.recommendations?.accessories?.length > 0 ? 
+          weather.recommendations.accessories.join(', ') : 'Basic travel essentials';
+        
+        weatherContext = `
+Weather Forecast for ${destination}:
+- Average temperature: ${Math.round(avgTemp)}°F
+- Expected conditions: ${weatherConditions}
+- Days with precipitation: ${rainDays}/${weather.forecast.length}
+- Recommended clothing: ${clothingRecs}
+- Additional packing: ${accessoryRecs}
+
+Consider the weather when suggesting activities (indoor alternatives for rainy days) and include appropriate clothing recommendations in tips.`;
+      } catch (weatherError) {
+        console.warn('⚠️ Error processing weather data for AI prompt:', weatherError.message);
+        weatherContext = ''; // Skip weather context if there's an error
+      }
+    }
+
     return `Create a travel itinerary in JSON format for ${destination}, ${diffDays} days, ${numTravelers} traveler(s), budget: ${budget || 'moderate'}.
 
 Group Size: ${numTravelers} ${numTravelers === 1 ? 'solo traveler' : numTravelers === 2 ? 'couple' : `group of ${numTravelers} people`}
 ${locationContext}
+${weatherContext}
 
 IMPORTANT: 
 - Use plain text only. Do not use markdown formatting (**bold**, *italics*) or special characters. Write in clean, readable plain text.
@@ -213,12 +281,13 @@ IMPORTANT:
 - ${numTravelers === 1 ? 'Focus on solo-friendly activities and single occupancy options.' : 
    numTravelers === 2 ? 'Recommend romantic/couple activities and double occupancy accommodations.' : 
    `Plan group activities suitable for ${numTravelers} people and recommend group accommodations/transportation.`}
+${weather ? '- Factor in the weather forecast when suggesting activities and include weather-appropriate clothing recommendations.' : ''}
 
 JSON format (be concise):
 {
   "title": "Trip title",
   "duration": "${diffDays} Days", 
-  "overview": "Brief overview in plain text",
+  "overview": "Brief overview in plain text${weather ? ' including weather considerations' : ''}",
   "days": [
     {
       "day": 1,
@@ -229,13 +298,14 @@ JSON format (be concise):
       "budget": "Daily budget estimate"
     }
   ],
-  "tips": ["Tip 1 in plain text without markdown", "Tip 2 in plain text without markdown", "Tip 3 in plain text without markdown"],
-  "totalEstimatedCost": "Total cost estimate"
+  "tips": ["Tip 1 in plain text without markdown", "Tip 2 in plain text without markdown", "Tip 3 in plain text without markdown"${weather ? ', "Weather-appropriate clothing and packing suggestions based on forecast"' : ''}],
+  "totalEstimatedCost": "Total cost estimate"${weather ? ',\n  "weatherInfo": {\n    "forecast": "Brief weather summary for trip dates",\n    "packingRecommendations": ["Essential items for the weather conditions"]\n  }' : ''}
 }
 
 Include specific places, restaurants, attractions for ${destination}. Focus on popular attractions and practical details.
 Use plain text descriptions without any markdown formatting like asterisks or bold text.
 Consider group size of ${numTravelers} ${numTravelers === 1 ? 'solo traveler' : 'travelers'} for all recommendations (activities, restaurants, accommodations).
+${weather ? 'Include indoor and outdoor activity options based on the weather forecast. Suggest appropriate clothing and gear in the tips section.' : ''}
 ${preferences.excludedPlaces ? `Exclude: ${preferences.excludedPlaces.join(', ')}` : ''}
 ${currentLocation ? `Consider transportation from ${currentLocation.name} and include travel recommendations.` : ''}
 
@@ -272,7 +342,7 @@ Return only valid JSON with plain text content, no markdown formatting, no extra
       }
 
       // Try to extract JSON from the response
-      let jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+      const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         try {
           const parsed = JSON.parse(jsonMatch[0]);

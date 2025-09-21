@@ -1,6 +1,7 @@
 import { db } from '../config/firebase.js';
 import { callVertexAI } from '../services/vertexService.js';
 import { UserService } from '../services/userService.js';
+import weatherService from '../services/weatherService.js';
 
 export class TripController {
   static async getUserTrips(req, res) {
@@ -394,10 +395,24 @@ export class TripController {
         budget: trip.budget
       });
 
-      // Generate itinerary using VertexAI
+      // Get weather forecast for the destination
+      let weatherData = null;
+      try {
+        console.log('🌤️ Fetching weather data for', trip.destination);
+        const startDate = new Date(trip.startDate);
+        const endDate = new Date(trip.endDate);
+        weatherData = await weatherService.getWeatherForTrip(trip.destination, startDate, endDate);
+        console.log('✅ Weather data fetched successfully');
+      } catch (error) {
+        console.warn('⚠️ Failed to fetch weather data:', error.message);
+        // Continue without weather data
+      }
+
+      // Generate itinerary using VertexAI with weather data
       const response = await callVertexAI({
         trip: { id, ...trip },
-        preferences
+        preferences,
+        weather: weatherData
       });
 
       console.log('📝 Vertex AI response:', {
@@ -830,10 +845,24 @@ export class TripController {
         });
       }
 
-      // Generate new itinerary with excluded places
+      // Get weather forecast for the destination
+      let weatherData = null;
+      try {
+        console.log('🌤️ Fetching weather data for regeneration:', trip.destination);
+        const startDate = new Date(trip.startDate);
+        const endDate = new Date(trip.endDate);
+        weatherData = await weatherService.getWeatherForTrip(trip.destination, startDate, endDate);
+        console.log('✅ Weather data fetched successfully for regeneration');
+      } catch (error) {
+        console.warn('⚠️ Failed to fetch weather data during regeneration:', error.message);
+        // Continue without weather data
+      }
+
+      // Generate new itinerary with excluded places and weather data
       const response = await callVertexAI({
         trip: { id, ...trip },
-        preferences: { ...preferences, excludedPlaces }
+        preferences: { ...preferences, excludedPlaces },
+        weather: weatherData
       });
 
       if (!response.success) {
