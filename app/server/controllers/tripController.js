@@ -280,11 +280,27 @@ export class TripController {
         });
       }
 
+      // Prevent editing if payment is made
+      if (trip.paymentStatus === 'paid') {
+        return res.status(400).json({
+          success: false,
+          error: 'Cannot edit trip after payment has been made'
+        });
+      }
+
       const updatedTrip = {
         ...trip,
         ...updates,
         updatedAt: new Date().toISOString()
       };
+
+      // If trip was booked but not paid, reset booking status when edited
+      if (trip.bookingStatus === 'booked' && trip.paymentStatus !== 'paid') {
+        updatedTrip.bookingStatus = null;
+        updatedTrip.paymentStatus = null;
+        updatedTrip.bookingDetails = null;
+        updatedTrip.bookedAt = null;
+      }
 
       await tripRef.update(updatedTrip);
 
@@ -356,11 +372,48 @@ export class TripController {
         });
       }
 
+      console.log('🎯 Generating itinerary for trip:', {
+        tripId: id,
+        destination: trip.destination,
+        startDate: trip.startDate,
+        endDate: trip.endDate,
+        budget: trip.budget
+      });
+
       // Generate itinerary using VertexAI
-      const itinerary = await callVertexAI({
+      const response = await callVertexAI({
         trip: { id, ...trip },
         preferences
       });
+
+      console.log('📝 Vertex AI response:', {
+        success: response.success,
+        fallback: response.fallback,
+        hasData: !!response.data,
+        dataStructure: response.data ? Object.keys(response.data) : null
+      });
+
+      if (!response.success && !response.fallback) {
+        console.error('❌ Vertex AI failed completely:', response.error);
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to generate itinerary',
+          details: response.error
+        });
+      }
+
+      const itinerary = response.data;
+
+      // Validate itinerary structure
+      if (!itinerary || typeof itinerary !== 'object') {
+        console.error('❌ Invalid itinerary structure:', itinerary);
+        return res.status(500).json({
+          success: false,
+          error: 'Generated itinerary has invalid structure'
+        });
+      }
+
+      console.log('✅ Valid itinerary generated, updating trip...');
 
       // Update trip with generated itinerary
       await tripRef.update({
@@ -369,15 +422,23 @@ export class TripController {
         updatedAt: new Date().toISOString()
       });
 
-      res.json({
+      console.log('🎉 Trip updated successfully with itinerary');
+
+      const responseData = {
         success: true,
         trip: {
           id,
           ...trip,
           itinerary,
           status: 'planned'
-        }
-      });
+        },
+        message: response.fallback ? 'Itinerary generated using fallback content' : 'Itinerary generated successfully'
+      };
+
+      // Log response size for debugging
+      console.log('📤 Sending response with itinerary size:', JSON.stringify(responseData).length, 'characters');
+
+      res.json(responseData);
     } catch (error) {
       console.error('Generate itinerary error:', error);
       res.status(500).json({
@@ -525,5 +586,364 @@ export class TripController {
         error: 'Failed to get participants'
       });
     }
+  }
+
+  static async bookTrip(req, res) {
+    try {
+      const uid = req.user?.uid;
+      const { id } = req.params;
+
+      if (uid === 'anonymous') {
+        return res.status(401).json({
+          success: false,
+          error: 'Please log in to book trips'
+        });
+      }
+
+      const tripRef = db.ref(`trips/${uid}/${id}`);
+      const snapshot = await tripRef.once('value');
+      const trip = snapshot.val();
+
+      if (!trip) {
+        return res.status(404).json({
+          success: false,
+          error: 'Trip not found'
+        });
+      }
+
+      if (!trip.itinerary) {
+        return res.status(400).json({
+          success: false,
+          error: 'Cannot book trip without itinerary. Please generate itinerary first.'
+        });
+      }
+
+      if (trip.bookingStatus === 'paid') {
+        return res.status(400).json({
+          success: false,
+          error: 'Trip is already booked and paid for'
+        });
+      }
+
+      // Generate dummy booking details
+      const bookingDetails = TripController.generateBookingDetails(trip);
+
+      const bookingData = {
+        bookingStatus: 'booked',
+        paymentStatus: 'pending',
+        bookingDetails,
+        bookedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      await tripRef.update(bookingData);
+
+      res.json({
+        success: true,
+        message: 'Trip booked successfully! Proceed to payment.',
+        trip: {
+          id,
+          ...trip,
+          ...bookingData
+        }
+      });
+    } catch (error) {
+      console.error('Book trip error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to book trip'
+      });
+    }
+  }
+
+  static async processPayment(req, res) {
+    try {
+      const uid = req.user?.uid;
+      const { id } = req.params;
+
+      if (uid === 'anonymous') {
+        return res.status(401).json({
+          success: false,
+          error: 'Please log in to process payment'
+        });
+      }
+
+      const tripRef = db.ref(`trips/${uid}/${id}`);
+      const snapshot = await tripRef.once('value');
+      const trip = snapshot.val();
+
+      if (!trip) {
+        return res.status(404).json({
+          success: false,
+          error: 'Trip not found'
+        });
+      }
+
+      if (trip.bookingStatus !== 'booked') {
+        return res.status(400).json({
+          success: false,
+          error: 'Trip must be booked before payment'
+        });
+      }
+
+      if (trip.paymentStatus === 'paid') {
+        return res.status(400).json({
+          success: false,
+          error: 'Payment already processed'
+        });
+      }
+
+      // Simulate payment processing
+      const paymentData = {
+        paymentStatus: 'paid',
+        paidAt: new Date().toISOString(),
+        paymentId: 'pay_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+        updatedAt: new Date().toISOString()
+      };
+
+      await tripRef.update(paymentData);
+
+      res.json({
+        success: true,
+        message: 'Payment processed successfully!',
+        trip: {
+          id,
+          ...trip,
+          ...paymentData
+        }
+      });
+    } catch (error) {
+      console.error('Process payment error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to process payment'
+      });
+    }
+  }
+
+  static async cancelBooking(req, res) {
+    try {
+      const uid = req.user?.uid;
+      const { id } = req.params;
+
+      if (uid === 'anonymous') {
+        return res.status(401).json({
+          success: false,
+          error: 'Please log in to cancel booking'
+        });
+      }
+
+      const tripRef = db.ref(`trips/${uid}/${id}`);
+      const snapshot = await tripRef.once('value');
+      const trip = snapshot.val();
+
+      if (!trip) {
+        return res.status(404).json({
+          success: false,
+          error: 'Trip not found'
+        });
+      }
+
+      if (trip.paymentStatus !== 'paid') {
+        return res.status(400).json({
+          success: false,
+          error: 'Can only cancel paid bookings'
+        });
+      }
+
+      if (trip.cancellationStatus === 'cancelled') {
+        return res.status(400).json({
+          success: false,
+          error: 'Booking is already cancelled'
+        });
+      }
+
+      // Calculate refund based on days until trip
+      const refundInfo = TripController.calculateRefund(trip);
+
+      const cancellationData = {
+        cancellationStatus: 'cancelled',
+        cancelledAt: new Date().toISOString(),
+        refundInfo,
+        updatedAt: new Date().toISOString()
+      };
+
+      await tripRef.update(cancellationData);
+
+      res.json({
+        success: true,
+        message: 'Booking cancelled successfully',
+        refundInfo,
+        trip: {
+          id,
+          ...trip,
+          ...cancellationData
+        }
+      });
+    } catch (error) {
+      console.error('Cancel booking error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to cancel booking'
+      });
+    }
+  }
+
+  static async regenerateItinerary(req, res) {
+    try {
+      const uid = req.user?.uid;
+      const { id } = req.params;
+      const { excludedPlaces, preferences } = req.body;
+
+      if (uid === 'anonymous') {
+        return res.status(401).json({
+          success: false,
+          error: 'Please log in to regenerate itinerary'
+        });
+      }
+
+      const tripRef = db.ref(`trips/${uid}/${id}`);
+      const snapshot = await tripRef.once('value');
+      const trip = snapshot.val();
+
+      if (!trip) {
+        return res.status(404).json({
+          success: false,
+          error: 'Trip not found'
+        });
+      }
+
+      if (trip.paymentStatus === 'paid') {
+        return res.status(400).json({
+          success: false,
+          error: 'Cannot modify itinerary after payment has been made'
+        });
+      }
+
+      // Generate new itinerary with excluded places
+      const response = await callVertexAI({
+        trip: { id, ...trip },
+        preferences: { ...preferences, excludedPlaces }
+      });
+
+      if (!response.success) {
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to regenerate itinerary',
+          details: response.error
+        });
+      }
+
+      const itinerary = response.data;
+
+      // Reset booking status if itinerary changes after booking
+      const updateData = {
+        itinerary,
+        status: 'planned',
+        updatedAt: new Date().toISOString()
+      };
+
+      // If trip was booked but not paid, reset booking status
+      if (trip.bookingStatus === 'booked' && trip.paymentStatus !== 'paid') {
+        updateData.bookingStatus = null;
+        updateData.paymentStatus = null;
+        updateData.bookingDetails = null;
+        updateData.bookedAt = null;
+      }
+
+      await tripRef.update(updateData);
+
+      res.json({
+        success: true,
+        message: 'Itinerary regenerated successfully!',
+        trip: {
+          id,
+          ...trip,
+          ...updateData
+        }
+      });
+    } catch (error) {
+      console.error('Regenerate itinerary error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to regenerate itinerary'
+      });
+    }
+  }
+
+  // Helper method to generate dummy booking details
+  static generateBookingDetails(trip) {
+    const hotels = [
+      'Grand Plaza Hotel', 'City Center Inn', 'Luxury Resort & Spa', 
+      'Boutique Hotel', 'Mountain View Lodge', 'Seaside Resort'
+    ];
+    
+    const flights = [
+      'Flight AA123', 'Flight DL456', 'Flight UA789', 
+      'Flight SW101', 'Flight JB202', 'Flight AS303'
+    ];
+
+    const startDate = new Date(trip.startDate);
+    const endDate = new Date(trip.endDate);
+    const nights = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+
+    return {
+      accommodation: {
+        name: hotels[Math.floor(Math.random() * hotels.length)],
+        checkIn: trip.startDate,
+        checkOut: trip.endDate,
+        nights: nights,
+        confirmationNumber: 'HTL' + Date.now().toString().slice(-6)
+      },
+      flights: {
+        outbound: {
+          flightNumber: flights[Math.floor(Math.random() * flights.length)],
+          departure: trip.startDate,
+          confirmationNumber: 'FLT' + Date.now().toString().slice(-6)
+        },
+        return: {
+          flightNumber: flights[Math.floor(Math.random() * flights.length)],
+          departure: trip.endDate,
+          confirmationNumber: 'FLT' + (Date.now() + 1).toString().slice(-6)
+        }
+      },
+      totalCost: trip.budget || Math.floor(Math.random() * 5000) + 1000
+    };
+  }
+
+  // Helper method to calculate refund based on cancellation timing
+  static calculateRefund(trip) {
+    const tripStartDate = new Date(trip.startDate);
+    const currentDate = new Date();
+    const daysUntilTrip = Math.ceil((tripStartDate - currentDate) / (1000 * 60 * 60 * 24));
+    
+    let refundPercentage;
+    let cancellationFee;
+
+    if (daysUntilTrip >= 30) {
+      refundPercentage = 70; // 30% cancellation fee
+      cancellationFee = 30;
+    } else if (daysUntilTrip >= 14) {
+      refundPercentage = 60; // 40% cancellation fee
+      cancellationFee = 40;
+    } else if (daysUntilTrip >= 7) {
+      refundPercentage = 50; // 50% cancellation fee
+      cancellationFee = 50;
+    } else {
+      refundPercentage = 0; // No refund
+      cancellationFee = 100;
+    }
+
+    const totalCost = trip.bookingDetails?.totalCost || trip.budget || 0;
+    const refundAmount = Math.floor((totalCost * refundPercentage) / 100);
+
+    return {
+      daysUntilTrip,
+      cancellationFeePercentage: cancellationFee,
+      refundPercentage,
+      totalCost,
+      refundAmount,
+      cancellationFeeAmount: totalCost - refundAmount
+    };
   }
 }

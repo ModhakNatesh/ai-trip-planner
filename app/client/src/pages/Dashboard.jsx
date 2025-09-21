@@ -13,6 +13,7 @@ const Dashboard = () => {
   const { user } = useAuthStore();
   const { trips, setTrips, addTrip, deleteTrip, isLoading, setLoading } = useTripStore();
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingTrip, setEditingTrip] = useState(null);
   const [formData, setFormData] = useState({
     destination: '',
     startDate: '',
@@ -21,6 +22,30 @@ const Dashboard = () => {
     numberOfUsers: 1,
     participants: []
   });
+
+  const getStatusGradient = (status) => {
+    switch (status) {
+      case 'planning':
+        return 'from-amber-400 to-orange-500';
+      case 'planned':
+        return 'from-emerald-400 to-green-500';
+      default:
+        return 'from-slate-400 to-slate-500';
+    }
+  };
+
+  const getBookingStatusBadge = (trip) => {
+    if (trip.cancellationStatus === 'cancelled') {
+      return <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800 font-medium">Cancelled</span>;
+    } else if (trip.paymentStatus === 'paid') {
+      return <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 font-medium">✓ Paid</span>;
+    } else if (trip.bookingStatus === 'booked') {
+      return <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800 font-medium animate-pulse">Pay Now</span>;
+    } else if (trip.itinerary) {
+      return <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 font-medium">Ready</span>;
+    }
+    return null;
+  };
 
   const loadTrips = useCallback(async () => {
     setLoading(true);
@@ -84,7 +109,13 @@ const Dashboard = () => {
       setFormData({ destination: '', startDate: '', endDate: '', budget: '', numberOfUsers: 1, participants: [] });
       setShowCreateForm(false);
     } catch (error) {
-      toast.error('Failed to create trip');
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        toast.error('Request timed out. The server may be busy. Please try again.');
+      } else if (error.response?.status === 500) {
+        toast.error('Server error occurred. Please try again later.');
+      } else {
+        toast.error('Failed to create trip. Please check your connection and try again.');
+      }
       console.error('Create trip error:', error);
     }
   };
@@ -114,19 +145,82 @@ const Dashboard = () => {
     }
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString();
+  const handleEditTrip = (trip) => {
+    setEditingTrip(trip);
+    setFormData({
+      destination: trip.destination || '',
+      startDate: trip.startDate || '',
+      endDate: trip.endDate || '',
+      budget: trip.budget || '',
+      numberOfUsers: (trip.participants?.length || 0) + 1,
+      participants: trip.participants || []
+    });
+    setShowCreateForm(true);
   };
 
-  const getStatusGradient = (status) => {
-    switch (status) {
-      case 'planning':
-        return 'from-amber-400 to-orange-500';
-      case 'planned':
-        return 'from-emerald-400 to-teal-500';
-      default:
-        return 'from-slate-400 to-slate-500';
+  const handleUpdateTrip = async () => {
+    // Validation
+    if (!formData.destination || !formData.startDate || !formData.endDate) {
+      toast.error('Please fill in all required fields (destination, start date, end date)');
+      return;
     }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (formData.numberOfUsers > 1) {
+      if (formData.participants.length !== formData.numberOfUsers - 1) {
+        toast.error(`Please add exactly ${formData.numberOfUsers - 1} participant email(s)`);
+        return;
+      }
+
+      const invalidEmails = formData.participants.filter(email => !emailRegex.test(email));
+      if (invalidEmails.length > 0) {
+        toast.error('Please enter valid email addresses for all participants');
+        return;
+      }
+
+      const uniqueEmails = new Set(formData.participants);
+      if (uniqueEmails.size !== formData.participants.length) {
+        toast.error('Each participant must have a unique email address');
+        return;
+      }
+    }
+
+    try {
+      const response = await apiService.updateTrip(editingTrip.id, formData);
+      toast.success('Trip updated successfully!');
+      setFormData({ destination: '', startDate: '', endDate: '', budget: '', numberOfUsers: 1, participants: [] });
+      setShowCreateForm(false);
+      setEditingTrip(null);
+      loadTrips(); // Reload to get updated trips
+    } catch (error) {
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        toast.error('Request timed out. The server may be busy. Please try again.');
+      } else if (error.response?.status === 500) {
+        toast.error('Server error occurred. Please try again later.');
+      } else {
+        toast.error('Failed to update trip. Please check your connection and try again.');
+      }
+      console.error('Update trip error:', error);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingTrip(null);
+    setShowCreateForm(false);
+    setFormData({ destination: '', startDate: '', endDate: '', budget: '', numberOfUsers: 1, participants: [] });
+  };
+
+  const handleFormSubmit = (e) => {
+    e.preventDefault();
+    if (editingTrip) {
+      handleUpdateTrip();
+    } else {
+      handleCreateTrip(e);
+    }
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString();
   };
 
   if (isLoading) {
@@ -166,7 +260,7 @@ const Dashboard = () => {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
             <div className="bg-white/70 backdrop-blur-md rounded-2xl p-6 border border-white/20 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
               <div className="flex items-center justify-between">
                 <div>
@@ -182,8 +276,8 @@ const Dashboard = () => {
             <div className="bg-white/70 backdrop-blur-md rounded-2xl p-6 border border-white/20 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-slate-600">Planned Trips</p>
-                  <p className="text-3xl font-bold text-slate-800">{trips.filter(t => t.status === 'planned').length}</p>
+                  <p className="text-sm font-medium text-slate-600">Confirmed</p>
+                  <p className="text-3xl font-bold text-emerald-600">{trips.filter(t => t.paymentStatus === 'paid').length}</p>
                 </div>
                 <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center">
                   <Star className="w-6 h-6 text-white" />
@@ -195,10 +289,23 @@ const Dashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-slate-600">In Planning</p>
-                  <p className="text-3xl font-bold text-slate-800">{trips.filter(t => t.status === 'planning').length}</p>
+                  <p className="text-3xl font-bold text-amber-600">{trips.filter(t => t.status === 'planning').length}</p>
                 </div>
                 <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl flex items-center justify-center">
                   <Clock className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white/70 backdrop-blur-md rounded-2xl p-6 border border-white/20 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105 cursor-pointer"
+                 onClick={() => navigate('/bookings')}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-600">Bookings</p>
+                  <p className="text-3xl font-bold text-purple-600">{trips.filter(t => t.bookingStatus || t.paymentStatus === 'paid').length}</p>
+                </div>
+                <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-purple-600 rounded-xl flex items-center justify-center">
+                  <Globe className="w-6 h-6 text-white" />
                 </div>
               </div>
             </div>
@@ -224,14 +331,14 @@ const Dashboard = () => {
                 <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-6">
                   <CardTitle className="text-white text-2xl font-bold flex items-center">
                     <Navigation className="mr-3 h-6 w-6" />
-                    Create Your Next Adventure
+                    {editingTrip ? 'Edit Your Adventure' : 'Create Your Next Adventure'}
                   </CardTitle>
                   <CardDescription className="text-blue-100 mt-2">
-                    Let AI craft the perfect itinerary for your dream destination
+                    {editingTrip ? 'Update your trip details and preferences' : 'Let AI craft the perfect itinerary for your dream destination'}
                   </CardDescription>
                 </div>
                 <CardContent className="p-8">
-                  <form onSubmit={handleCreateTrip} className="space-y-6">
+                  <form onSubmit={handleFormSubmit} className="space-y-6">
                     <div className="grid md:grid-cols-2 gap-6">
                       <div className="space-y-2">
                         <label htmlFor="destination" className="block text-sm font-semibold text-slate-700">
@@ -348,16 +455,15 @@ const Dashboard = () => {
                         type="submit"
                         className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
                       >
-                        Create Trip
+                        {editingTrip ? 'Update Trip' : 'Create Trip'}
                       </Button>
 
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={() => setShowCreateForm(false)}
+                        onClick={editingTrip ? handleCancelEdit : () => setShowCreateForm(false)}
                         className="flex-1 border-slate-300 text-slate-700 hover:bg-slate-50 py-3 rounded-xl transition-all duration-300"
                       >
-                        {/* ✅ Plain text, no icon */}
                         Cancel
                       </Button>
                     </div>
@@ -409,15 +515,18 @@ const Dashboard = () => {
                       <div className={`h-2 bg-gradient-to-r ${getStatusGradient(trip.status)}`}></div>
                       <div onClick={() => navigate(`/trip/${trip.id}`)}>
                         <CardHeader className="pb-4">
-                          <CardTitle className="flex items-center text-slate-800 group-hover:text-blue-600 transition-colors duration-300">
-                            <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-500 rounded-lg flex items-center justify-center mr-3">
-                              <MapPin className="h-4 w-4 text-white" />
+                          <CardTitle className="flex items-center justify-between text-slate-800 group-hover:text-blue-600 transition-colors duration-300">
+                            <div className="flex items-center">
+                              <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-500 rounded-lg flex items-center justify-center mr-3">
+                                <MapPin className="h-4 w-4 text-white" />
+                              </div>
+                              {trip.destination}
                             </div>
-                            {trip.destination}
+                            {getBookingStatusBadge(trip)}
                           </CardTitle>
                           <CardDescription className="flex items-center mt-2">
                             <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r ${getStatusGradient(trip.status)} text-white shadow-md`}>
-                              <div className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></div>
+                              <span className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse inline-block"></span>
                               {trip.status.charAt(0).toUpperCase() + trip.status.slice(1)}
                             </span>
                             <span className="ml-2 text-xs text-blue-600 font-medium bg-blue-50 px-2 py-1 rounded">Owner</span>
@@ -446,7 +555,7 @@ const Dashboard = () => {
                       </div>
                       <CardContent className="pt-0">
                         <div className="space-y-3">
-                          {trip.status === 'planning' && (
+                          {trip.status === 'planning' && !trip.itinerary && (
                             <Button
                               size="sm"
                               className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold py-2 rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
@@ -459,6 +568,36 @@ const Dashboard = () => {
                               Generate AI Itinerary
                             </Button>
                           )}
+                          
+                          {/* Book Now Button */}
+                          {trip.itinerary && !trip.bookingStatus && trip.paymentStatus !== 'paid' && trip.cancellationStatus !== 'cancelled' && (
+                            <Button
+                              size="sm"
+                              className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold py-2 rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/trip/${trip.id}`);
+                              }}
+                            >
+                              <Star className="h-4 w-4 mr-2" />
+                              Book This Trip
+                            </Button>
+                          )}
+
+                          {/* Complete Payment Button */}
+                          {trip.bookingStatus === 'booked' && trip.paymentStatus !== 'paid' && (
+                            <Button
+                              size="sm"
+                              className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-semibold py-2 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 animate-pulse"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/payment/${trip.id}`);
+                              }}
+                            >
+                              💳 Complete Payment
+                            </Button>
+                          )}
+
                           <div className="flex space-x-2">
                             <Button
                               size="sm"
@@ -472,26 +611,35 @@ const Dashboard = () => {
                               <Eye className="h-4 w-4 mr-1" />
                               View
                             </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="flex-1 border-slate-200 text-slate-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 rounded-lg transition-all duration-300"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <Edit className="h-4 w-4 mr-1" />
-                              Edit
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteTrip(trip.id);
-                              }}
-                              className="border-slate-200 text-red-500 hover:bg-red-50 hover:border-red-300 hover:text-red-600 rounded-lg transition-all duration-300"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            
+                            {trip.paymentStatus !== 'paid' && trip.cancellationStatus !== 'cancelled' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1 border-slate-200 text-slate-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 rounded-lg transition-all duration-300"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditTrip(trip);
+                                }}
+                              >
+                                <Edit className="h-4 w-4 mr-1" />
+                                Edit
+                              </Button>
+                            )}
+                            
+                            {trip.paymentStatus !== 'paid' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteTrip(trip.id);
+                                }}
+                                className="border-slate-200 text-red-500 hover:bg-red-50 hover:border-red-300 hover:text-red-600 rounded-lg transition-all duration-300"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </CardContent>
@@ -527,7 +675,7 @@ const Dashboard = () => {
                             </CardTitle>
                             <CardDescription className="flex items-center mt-2">
                               <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r ${getStatusGradient(trip.status)} text-white shadow-md`}>
-                                <div className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></div>
+                                <span className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse inline-block"></span>
                                 {trip.status.charAt(0).toUpperCase() + trip.status.slice(1)}
                               </span>
                               <span className="ml-2 text-xs text-purple-600 font-medium bg-purple-50 px-2 py-1 rounded">Participant</span>

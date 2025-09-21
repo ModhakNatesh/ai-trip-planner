@@ -6,7 +6,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5003
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 30000, // Increased to 30 seconds for AI operations
   headers: {
     'Content-Type': 'application/json',
   },
@@ -57,12 +57,19 @@ export const apiService = {
 
   // Trip endpoints
   getTrips: (token) => api.get('/api/trips', token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
-  createTrip: (tripData) => api.post('/api/trips', tripData),
+  createTrip: (tripData) => api.post('/api/trips', tripData, { timeout: 30000 }), // 30 seconds for trip creation
   getTripById: (id) => api.get(`/api/trips/${id}`),
   updateTrip: (id, updateData) => api.put(`/api/trips/${id}`, updateData),
   deleteTrip: (id) => api.delete(`/api/trips/${id}`),
   generateItinerary: (id, preferences) => 
-    api.post(`/api/trips/${id}/generate-itinerary`, { preferences }),
+    api.post(`/api/trips/${id}/generate-itinerary`, { preferences }, { timeout: 60000 }), // 60 seconds for AI generation
+  regenerateItinerary: (id, data) => 
+    api.post(`/api/trips/${id}/regenerate-itinerary`, data, { timeout: 60000 }), // 60 seconds for AI generation
+  
+  // Booking and payment endpoints
+  bookTrip: (id) => api.post(`/api/trips/${id}/book`),
+  processPayment: (id) => api.post(`/api/trips/${id}/payment`),
+  cancelBooking: (id) => api.post(`/api/trips/${id}/cancel`),
   
   // Trip participant endpoints
   addParticipants: (tripId, participants) => 

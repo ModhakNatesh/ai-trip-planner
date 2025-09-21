@@ -17,9 +17,6 @@ import tripRoutes from './routes/trips.js';
 // Import middleware
 import { errorHandler } from './middleware/errorHandler.js';
 
-// Load environment variables
-dotenv.config();
-
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -46,6 +43,13 @@ app.use(morgan('combined'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(limiter);
+
+// Set server timeout to prevent hanging requests
+app.use((req, res, next) => {
+  req.setTimeout(60000); // 60 seconds timeout
+  res.setTimeout(60000);
+  next();
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
