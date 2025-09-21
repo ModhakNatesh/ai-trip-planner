@@ -104,7 +104,14 @@ const Dashboard = () => {
 
     try {
       const response = await apiService.createTrip(formData);
-      addTrip(response.data.trip);
+      
+      // Add role property to the trip since it's created by the current user
+      const tripWithRole = {
+        ...response.data.trip,
+        role: 'owner'
+      };
+      
+      addTrip(tripWithRole);
       toast.success('Trip created successfully!');
       setFormData({ destination: '', startDate: '', endDate: '', budget: '', numberOfUsers: 1, participants: [] });
       setShowCreateForm(false);
