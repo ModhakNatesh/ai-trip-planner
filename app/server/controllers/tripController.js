@@ -73,7 +73,7 @@ export class TripController {
   static async createTrip(req, res) {
     try {
       const uid = req.user?.uid || 'anonymous';
-      const { destination, startDate, endDate, budget, preferences, participants } = req.body;
+      const { destination, startDate, endDate, budget, preferences, participants, currentLocation } = req.body;
 
       if (!destination || !startDate || !endDate) {
         return res.status(400).json({
@@ -99,6 +99,7 @@ export class TripController {
           budget,
           preferences: preferences || {},
           participants: participants || [],
+          currentLocation: currentLocation || null,
           status: 'planning',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -122,6 +123,7 @@ export class TripController {
         budget,
         preferences: preferences || {},
         participants: participants || [],
+        currentLocation: currentLocation || null,
         status: 'planning',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -293,6 +295,18 @@ export class TripController {
         ...updates,
         updatedAt: new Date().toISOString()
       };
+
+      // Check if significant trip details changed that would require itinerary regeneration
+      const significantFields = ['destination', 'startDate', 'endDate', 'budget', 'numberOfUsers', 'participants'];
+      const hasSignificantChange = significantFields.some(field => 
+        updates[field] !== undefined && updates[field] !== trip[field]
+      );
+
+      // Clear itinerary if significant details changed
+      if (hasSignificantChange && trip.itinerary) {
+        updatedTrip.itinerary = null;
+        updatedTrip.status = 'draft'; // Reset status to draft to allow regeneration
+      }
 
       // If trip was booked but not paid, reset booking status when edited
       if (trip.bookingStatus === 'booked' && trip.paymentStatus !== 'paid') {

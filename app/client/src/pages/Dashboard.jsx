@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, MapPin, Calendar, DollarSign, Trash2, Edit, Eye, Plane, Globe, Clock, Star, Navigation, Sparkles, Users } from 'lucide-react';
+import { Plus, MapPin, Calendar, DollarSign, Trash2, Edit, Eye, Plane, Globe, Clock, Star, Navigation, Sparkles, Users, Locate, RefreshCw } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { useAuthStore, useTripStore } from '../store';
 import { apiService } from '../services/api';
+import { getUserLocation } from '../lib/geolocation';
 import toast from 'react-hot-toast';
 
 const Dashboard = () => {
@@ -14,19 +15,25 @@ const Dashboard = () => {
   const { trips, setTrips, addTrip, deleteTrip, isLoading, setLoading } = useTripStore();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingTrip, setEditingTrip] = useState(null);
+  const [currentLocation, setCurrentLocation] = useState(null);
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+  const [generatingTripId, setGeneratingTripId] = useState(null);
   const [formData, setFormData] = useState({
     destination: '',
     startDate: '',
     endDate: '',
     budget: '',
     numberOfUsers: 1,
-    participants: []
+    participants: [],
+    currentLocation: null
   });
 
   const getStatusGradient = (status) => {
     switch (status) {
       case 'planning':
         return 'from-amber-400 to-orange-500';
+      case 'draft':
+        return 'from-purple-400 to-pink-500';
       case 'planned':
         return 'from-emerald-400 to-green-500';
       default:
@@ -71,6 +78,27 @@ const Dashboard = () => {
     });
   };
 
+  const handleDetectLocation = async () => {
+    try {
+      setIsDetectingLocation(true);
+      toast.loading('Detecting your location...', { id: 'location' });
+      
+      const location = await getUserLocation();
+      setCurrentLocation(location);
+      setFormData({
+        ...formData,
+        currentLocation: location
+      });
+      
+      toast.success(`Location detected: ${location.name}`, { id: 'location' });
+    } catch (error) {
+      console.error('Location detection error:', error);
+      toast.error(`Failed to detect location: ${error.message}`, { id: 'location' });
+    } finally {
+      setIsDetectingLocation(false);
+    }
+  };
+
   const handleCreateTrip = async (e) => {
     e.preventDefault();
 
@@ -113,7 +141,8 @@ const Dashboard = () => {
       
       addTrip(tripWithRole);
       toast.success('Trip created successfully!');
-      setFormData({ destination: '', startDate: '', endDate: '', budget: '', numberOfUsers: 1, participants: [] });
+      setFormData({ destination: '', startDate: '', endDate: '', budget: '', numberOfUsers: 1, participants: [], currentLocation: null });
+      setCurrentLocation(null);
       setShowCreateForm(false);
     } catch (error) {
       if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
@@ -142,13 +171,16 @@ const Dashboard = () => {
 
   const handleGenerateItinerary = async (trip) => {
     try {
-      toast.loading('Generating itinerary...', { id: 'generate' });
+      setGeneratingTripId(trip.id);
+      toast.loading('🤖 AI is generating your personalized itinerary...', { id: 'generate' });
       await apiService.generateItinerary(trip.id, {});
-      toast.success('Itinerary generated successfully!', { id: 'generate' });
+      toast.success('🎉 Itinerary generated successfully!', { id: 'generate' });
       loadTrips(); // Reload to get updated trip
     } catch (error) {
       toast.error('Failed to generate itinerary', { id: 'generate' });
       console.error('Generate itinerary error:', error);
+    } finally {
+      setGeneratingTripId(null);
     }
   };
 
@@ -195,7 +227,8 @@ const Dashboard = () => {
     try {
       await apiService.updateTrip(editingTrip.id, formData);
       toast.success('Trip updated successfully!');
-      setFormData({ destination: '', startDate: '', endDate: '', budget: '', numberOfUsers: 1, participants: [] });
+      setFormData({ destination: '', startDate: '', endDate: '', budget: '', numberOfUsers: 1, participants: [], currentLocation: null });
+      setCurrentLocation(null);
       setShowCreateForm(false);
       setEditingTrip(null);
       loadTrips(); // Reload to get updated trips
@@ -214,7 +247,8 @@ const Dashboard = () => {
   const handleCancelEdit = () => {
     setEditingTrip(null);
     setShowCreateForm(false);
-    setFormData({ destination: '', startDate: '', endDate: '', budget: '', numberOfUsers: 1, participants: [] });
+    setFormData({ destination: '', startDate: '', endDate: '', budget: '', numberOfUsers: 1, participants: [], currentLocation: null });
+    setCurrentLocation(null);
   };
 
   const handleFormSubmit = (e) => {
@@ -296,7 +330,7 @@ const Dashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-slate-600">In Planning</p>
-                  <p className="text-3xl font-bold text-amber-600">{trips.filter(t => t.status === 'planning').length}</p>
+                  <p className="text-3xl font-bold text-amber-600">{trips.filter(t => t.status === 'planning' || t.status === 'draft').length}</p>
                 </div>
                 <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl flex items-center justify-center">
                   <Clock className="w-6 h-6 text-white" />
@@ -351,16 +385,36 @@ const Dashboard = () => {
                         <label htmlFor="destination" className="block text-sm font-semibold text-slate-700">
                           Destination *
                         </label>
-                        <Input
-                          id="destination"
-                          name="destination"
-                          type="text"
-                          required
-                          placeholder="e.g., Tokyo, Japan"
-                          value={formData.destination}
-                          onChange={handleInputChange}
-                          className="border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 h-12"
-                        />
+                        <div className="flex gap-2">
+                          <Input
+                            id="destination"
+                            name="destination"
+                            type="text"
+                            required
+                            placeholder="e.g., Tokyo, Japan"
+                            value={formData.destination}
+                            onChange={handleInputChange}
+                            className="border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 h-12 flex-1"
+                          />
+                          <Button
+                            type="button"
+                            onClick={handleDetectLocation}
+                            disabled={isDetectingLocation}
+                            className="h-12 px-4 bg-green-500 hover:bg-green-600 text-white rounded-xl flex items-center gap-2 transition-all duration-200"
+                          >
+                            {isDetectingLocation ? (
+                              <Locate className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Locate className="h-4 w-4" />
+                            )}
+                            {isDetectingLocation ? 'Detecting...' : 'My Location'}
+                          </Button>
+                        </div>
+                        {currentLocation && (
+                          <p className="text-sm text-green-600 mt-1">
+                            📍 Current location: {currentLocation.name}
+                          </p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <label htmlFor="budget" className="block text-sm font-semibold text-slate-700">
@@ -514,11 +568,25 @@ const Dashboard = () => {
                   {trips.filter(trip => trip.role === 'owner').map((trip, index) => (
                     <Card
                       key={trip.id}
-                      className="bg-white/80 backdrop-blur-md border-0 shadow-xl rounded-2xl overflow-hidden hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 group cursor-pointer"
+                      className="bg-white/80 backdrop-blur-md border-0 shadow-xl rounded-2xl overflow-hidden hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 group cursor-pointer relative"
                       style={{
                         animationDelay: `${index * 100}ms`
                       }}
                     >
+                      {/* Loading Overlay for Trip Generation */}
+                      {generatingTripId === trip.id && (
+                        <div className="absolute inset-0 bg-white/90 backdrop-blur-sm z-10 flex items-center justify-center">
+                          <div className="text-center">
+                            <div className="relative mb-3">
+                              <div className="w-12 h-12 border-4 border-transparent border-t-emerald-500 border-r-teal-500 rounded-full animate-spin"></div>
+                              <RefreshCw className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600 animate-pulse" />
+                            </div>
+                            <p className="text-sm font-medium text-gray-900 mb-1">🤖 AI Generating Itinerary</p>
+                            <p className="text-xs text-gray-600">Creating your perfect trip...</p>
+                          </div>
+                        </div>
+                      )}
+                      
                       <div className={`h-2 bg-gradient-to-r ${getStatusGradient(trip.status)}`}></div>
                       <div onClick={() => navigate(`/trip/${trip.id}`)}>
                         <CardHeader className="pb-4">
@@ -562,7 +630,7 @@ const Dashboard = () => {
                       </div>
                       <CardContent className="pt-0">
                         <div className="space-y-3">
-                          {trip.status === 'planning' && !trip.itinerary && (
+                          {(trip.status === 'planning' || trip.status === 'draft') && !trip.itinerary && (
                             <Button
                               size="sm"
                               className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold py-2 rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
@@ -570,9 +638,19 @@ const Dashboard = () => {
                                 e.stopPropagation();
                                 handleGenerateItinerary(trip);
                               }}
+                              disabled={generatingTripId === trip.id}
                             >
-                              <Sparkles className="h-4 w-4 mr-2" />
-                              Generate AI Itinerary
+                              {generatingTripId === trip.id ? (
+                                <>
+                                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                                  Generating AI Itinerary...
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles className="h-4 w-4 mr-2" />
+                                  Generate AI Itinerary
+                                </>
+                              )}
                             </Button>
                           )}
                           

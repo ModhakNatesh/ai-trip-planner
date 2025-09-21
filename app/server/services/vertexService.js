@@ -189,38 +189,57 @@ class VertexAIService {
   }
 
   buildTripPrompt(trip, preferences = {}) {
-    const { destination, startDate, endDate, budget, participants = [] } = trip;
+    const { destination, startDate, endDate, budget, participants = [], currentLocation, numberOfUsers } = trip;
     const startDateObj = new Date(startDate);
     const endDateObj = new Date(endDate);
     const diffTime = Math.abs(endDateObj - startDateObj);
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    const numTravelers = (participants.length || 0) + 1;
+    // Use numberOfUsers if available, otherwise calculate from participants + 1 (owner)
+    const numTravelers = numberOfUsers || (participants.length || 0) + 1;
+
+    // Add current location context if available
+    const locationContext = currentLocation ? 
+      `Starting from: ${currentLocation.name} (${currentLocation.latitude}, ${currentLocation.longitude}). Consider travel time and transportation options from this location to ${destination}.` : 
+      '';
 
     return `Create a travel itinerary in JSON format for ${destination}, ${diffDays} days, ${numTravelers} traveler(s), budget: ${budget || 'moderate'}.
+
+Group Size: ${numTravelers} ${numTravelers === 1 ? 'solo traveler' : numTravelers === 2 ? 'couple' : `group of ${numTravelers} people`}
+${locationContext}
+
+IMPORTANT: 
+- Use plain text only. Do not use markdown formatting (**bold**, *italics*) or special characters. Write in clean, readable plain text.
+- Consider the group size of ${numTravelers} people when recommending activities, accommodations, and transportation.
+- ${numTravelers === 1 ? 'Focus on solo-friendly activities and single occupancy options.' : 
+   numTravelers === 2 ? 'Recommend romantic/couple activities and double occupancy accommodations.' : 
+   `Plan group activities suitable for ${numTravelers} people and recommend group accommodations/transportation.`}
 
 JSON format (be concise):
 {
   "title": "Trip title",
   "duration": "${diffDays} Days", 
-  "overview": "Brief overview",
+  "overview": "Brief overview in plain text",
   "days": [
     {
       "day": 1,
-      "title": "Day title",
-      "activities": ["Activity 1", "Activity 2", "Activity 3"],
-      "meals": ["Breakfast suggestion", "Dinner suggestion"],
-      "transportation": "Transport method",
+      "title": "Day title in plain text",
+      "activities": ["Activity 1 description in plain text", "Activity 2 description in plain text", "Activity 3 description in plain text"],
+      "meals": ["Breakfast suggestion in plain text", "Dinner suggestion in plain text"],
+      "transportation": "Transport method in plain text",
       "budget": "Daily budget estimate"
     }
   ],
-  "tips": ["Tip 1", "Tip 2", "Tip 3"],
+  "tips": ["Tip 1 in plain text without markdown", "Tip 2 in plain text without markdown", "Tip 3 in plain text without markdown"],
   "totalEstimatedCost": "Total cost estimate"
 }
 
 Include specific places, restaurants, attractions for ${destination}. Focus on popular attractions and practical details.
+Use plain text descriptions without any markdown formatting like asterisks or bold text.
+Consider group size of ${numTravelers} ${numTravelers === 1 ? 'solo traveler' : 'travelers'} for all recommendations (activities, restaurants, accommodations).
 ${preferences.excludedPlaces ? `Exclude: ${preferences.excludedPlaces.join(', ')}` : ''}
+${currentLocation ? `Consider transportation from ${currentLocation.name} and include travel recommendations.` : ''}
 
-Return only valid JSON, no extra text.`;
+Return only valid JSON with plain text content, no markdown formatting, no extra text.`;
   }
 
   parseItineraryResponse(text, trip) {
@@ -261,7 +280,9 @@ Return only valid JSON, no extra text.`;
           // Validate the structure
           if (parsed.days && Array.isArray(parsed.days)) {
             console.log(`✅ Successfully parsed itinerary with ${parsed.days.length} days`);
-            return parsed;
+            // Clean markdown formatting from the parsed JSON
+            const cleanedItinerary = this.cleanMarkdownFromItinerary(parsed);
+            return cleanedItinerary;
           }
         } catch (parseError) {
           console.warn('🔧 Initial JSON parse failed, trying to repair...', parseError.message);
@@ -290,7 +311,9 @@ Return only valid JSON, no extra text.`;
             const repairedParsed = JSON.parse(repairedJson);
             if (repairedParsed.days && Array.isArray(repairedParsed.days)) {
               console.log(`✅ Successfully repaired and parsed itinerary with ${repairedParsed.days.length} days`);
-              return repairedParsed;
+              // Clean markdown formatting from the repaired JSON
+              const cleanedItinerary = this.cleanMarkdownFromItinerary(repairedParsed);
+              return cleanedItinerary;
             }
           } catch (repairError) {
             console.warn('🔧 JSON repair also failed:', repairError.message);
@@ -393,6 +416,43 @@ Return only valid JSON, no extra text.`;
 
   delay(ms) {
     return new Promise(resolve => global.setTimeout(resolve, ms));
+  }
+
+  cleanMarkdownFromItinerary(itinerary) {
+    // Helper function to clean markdown formatting from text
+    const cleanText = (text) => {
+      if (typeof text !== 'string') return text;
+      
+      return text
+        // Remove bold formatting **text**
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        // Remove italic formatting *text*
+        .replace(/\*(.*?)\*/g, '$1')
+        // Remove other markdown patterns
+        .replace(/__(.*?)__/g, '$1')
+        .replace(/_(.*?)_/g, '$1')
+        // Clean up any remaining asterisks that might be standalone
+        .replace(/\*+/g, '')
+        .trim();
+    };
+
+    // Deep clean the itinerary object
+    const cleanObject = (obj) => {
+      if (Array.isArray(obj)) {
+        return obj.map(item => cleanObject(item));
+      } else if (obj && typeof obj === 'object') {
+        const cleaned = {};
+        for (const [key, value] of Object.entries(obj)) {
+          cleaned[key] = cleanObject(value);
+        }
+        return cleaned;
+      } else if (typeof obj === 'string') {
+        return cleanText(obj);
+      }
+      return obj;
+    };
+
+    return cleanObject(itinerary);
   }
 }
 

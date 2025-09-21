@@ -153,8 +153,25 @@ const TripDetails = () => {
 
     try {
       toast.loading('Updating trip...', { id: 'update' });
+      
+      // Check if significant fields changed that would affect itinerary
+      const significantFields = ['destination', 'startDate', 'endDate', 'budget', 'numberOfUsers', 'participants'];
+      const hasSignificantChange = significantFields.some(field => 
+        editFormData[field] !== undefined && 
+        JSON.stringify(editFormData[field]) !== JSON.stringify(trip[field])
+      );
+      
       await apiService.updateTrip(trip.id, editFormData);
-      toast.success('Trip updated successfully!', { id: 'update' });
+      
+      if (hasSignificantChange && trip.itinerary) {
+        toast.success('Trip updated! Your itinerary has been cleared due to significant changes. Please regenerate it.', { 
+          id: 'update',
+          duration: 5000
+        });
+      } else {
+        toast.success('Trip updated successfully!', { id: 'update' });
+      }
+      
       setShowEditForm(false);
       setEditFormData({ destination: '', startDate: '', endDate: '', budget: '', numberOfUsers: 1, participants: [] });
       loadTripDetails(); // Reload to get updated trip
@@ -348,6 +365,7 @@ const TripDetails = () => {
           <CardDescription className="text-blue-100">
             <span className={`inline-block px-3 py-1 rounded-full text-sm ${
               trip.status === 'planning' ? 'bg-yellow-500/20 text-yellow-100' :
+              trip.status === 'draft' ? 'bg-purple-500/20 text-purple-100' :
               trip.status === 'planned' ? 'bg-green-500/20 text-green-100' :
               'bg-gray-500/20 text-gray-100'
             }`}>
@@ -405,7 +423,7 @@ const TripDetails = () => {
                   <Users className="h-4 w-4 mr-2" />
                   <span className="font-medium">{trip.ownerName || trip.ownerEmail || 'Trip Owner'}</span>
                   {trip.ownerEmail && (
-                    <span className="ml-2 text-sm text-blue-700/60">{trip.ownerEmail}</span>
+                    <span className="ml-2 text-sm text-white/70">{trip.ownerEmail}</span>
                   )}
                 </div>
                 <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded">Owner</span>
@@ -418,7 +436,7 @@ const TripDetails = () => {
                     <div className="flex items-center">
                       <Users className="h-4 w-4 mr-2" />
                       <span className="font-medium">{participant.name}</span>
-                      <span className="ml-2 text-sm text-blue-700/60">{participant.email}</span>
+                      <span className="ml-2 text-sm text-white/70">{participant.email}</span>
                     </div>
                     <span className="text-xs bg-purple-500 text-white px-2 py-0.5 rounded">Member</span>
                   </div>
@@ -430,7 +448,7 @@ const TripDetails = () => {
                     <div className="flex items-center">
                       <Users className="h-4 w-4 mr-2" />
                       <span className="font-medium">{email.split('@')[0]}</span>
-                      <span className="ml-2 text-sm text-blue-700/60">{email}</span>
+                      <span className="ml-2 text-sm text-white/70">{email}</span>
                     </div>
                     <span className="text-xs bg-purple-500 text-white px-2 py-0.5 rounded">Member</span>
                   </div>
@@ -571,6 +589,22 @@ const TripDetails = () => {
 
       {/* Itinerary Overview */}
       {itinerary && (
+        <div className="relative">
+          {/* Loading Overlay for Regeneration */}
+          {isRegenerating && (
+            <div className="absolute inset-0 bg-white/90 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg">
+              <div className="text-center">
+                <div className="relative mb-4">
+                  <div className="w-16 h-16 border-4 border-transparent border-t-orange-500 border-r-purple-500 rounded-full animate-spin"></div>
+                  <div className="absolute inset-0 w-16 h-16 border-4 border-transparent border-b-pink-500 border-l-cyan-500 rounded-full animate-spin opacity-75" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
+                  <RefreshCw className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-6 h-6 text-orange-600 animate-pulse" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">🔄 Regenerating Your Itinerary...</h3>
+                <p className="text-gray-600 text-sm">Creating a new personalized plan based on your preferences</p>
+              </div>
+            </div>
+          )}
+          
         <>
           {/* Trip Summary */}
           <Card>
@@ -787,10 +821,11 @@ const TripDetails = () => {
             </Card>
           )}
         </>
+        </div>
       )}
 
       {/* No Itinerary */}
-      {!itinerary && (
+      {!itinerary && !isGenerating && (
         <Card>
           <CardContent className="text-center py-12">
             <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -799,6 +834,31 @@ const TripDetails = () => {
             <Button onClick={() => navigate('/dashboard')}>
               Back to Dashboard
             </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Loading Itinerary */}
+      {isGenerating && (
+        <Card>
+          <CardContent className="text-center py-12">
+            <div className="flex flex-col items-center">
+              <div className="relative mb-6">
+                <div className="w-20 h-20 border-4 border-transparent border-t-blue-500 border-r-purple-500 rounded-full animate-spin"></div>
+                <div className="absolute inset-0 w-20 h-20 border-4 border-transparent border-b-pink-500 border-l-cyan-500 rounded-full animate-spin opacity-75" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
+                <RefreshCw className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 text-indigo-600 animate-pulse" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">🤖 AI is crafting your perfect itinerary...</h3>
+              <p className="text-gray-600 mb-4">This may take a few moments while we generate personalized recommendations</p>
+              <div className="flex items-center text-sm text-gray-500">
+                <div className="flex space-x-1 mr-2">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                  <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                  <div className="w-2 h-2 bg-pink-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                </div>
+                Processing your travel preferences...
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -813,7 +873,7 @@ const TripDetails = () => {
             </Button>
             
             {/* Generate Itinerary Button */}
-            {trip.status === 'planning' && !trip.itinerary && (
+            {(trip.status === 'planning' || trip.status === 'draft') && !trip.itinerary && (
               <Button 
                 className="bg-primary"
                 onClick={handleGenerateItinerary}
