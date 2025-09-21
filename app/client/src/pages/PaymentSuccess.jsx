@@ -87,7 +87,7 @@ const PaymentSuccess = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>What's Next?</CardTitle>
+            <CardTitle>What&apos;s Next?</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-3">
@@ -216,7 +216,7 @@ const PaymentSuccess = () => {
             <h4 className="font-medium text-yellow-800 mb-2">Important Notice</h4>
             <p className="text-sm text-yellow-700">
               Please save your confirmation numbers. You can view all your booking details 
-              in the "My Bookings" section anytime. If you need to cancel, please note that 
+              in the &quot;My Bookings&quot; section anytime. If you need to cancel, please note that 
               cancellation fees apply based on the timing of your cancellation.
             </p>
           </div>

@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Input } from '../components/ui/input';
 import { apiService } from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -120,19 +121,6 @@ const TripDetails = () => {
       toast.error('Failed to book trip', { id: 'book' });
       console.error('Book trip error:', error);
     }
-  };
-
-  const handleEditTrip = () => {
-    setEditFormData({
-      destination: trip.destination || '',
-      startDate: trip.startDate || '',
-      endDate: trip.endDate || '',
-      budget: trip.budget || '',
-      numberOfUsers: (trip.participants?.length || 0) + 1,
-      participants: trip.participants || []
-    });
-    setShowEditForm(true);
-    toast.success('Edit form opened. Update your trip details below.');
   };
 
   const handleUpdateTrip = async () => {
@@ -638,7 +626,7 @@ const TripDetails = () => {
             {trip.paymentStatus !== 'paid' && isEditing && (
               <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
                 <p className="text-sm text-orange-800 font-medium">
-                  🎯 Edit Mode Active: Click on activities below to exclude them from your itinerary, then click "Regenerate" to create an updated plan!
+                  🎯 Edit Mode Active: Click on activities below to exclude them from your itinerary, then click &quot;Regenerate&quot; to create an updated plan!
                 </p>
               </div>
             )}
@@ -646,7 +634,7 @@ const TripDetails = () => {
             {trip.paymentStatus !== 'paid' && !isEditing && excludedPlaces.size === 0 && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p className="text-sm text-blue-800">
-                  💡 Click "Edit Trip" above to customize your itinerary by excluding activities you don't want!
+                  💡 Click &quot;Edit Trip&quot; above to customize your itinerary by excluding activities you don&apos;t want!
                 </p>
               </div>
             )}

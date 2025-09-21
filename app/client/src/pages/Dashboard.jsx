@@ -186,7 +186,7 @@ const Dashboard = () => {
     }
 
     try {
-      const response = await apiService.updateTrip(editingTrip.id, formData);
+      await apiService.updateTrip(editingTrip.id, formData);
       toast.success('Trip updated successfully!');
       setFormData({ destination: '', startDate: '', endDate: '', budget: '', numberOfUsers: 1, participants: [] });
       setShowCreateForm(false);

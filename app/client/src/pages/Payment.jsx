@@ -1,11 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   CreditCard, 
   Lock, 
-  CheckCircle, 
   ArrowLeft,
-  DollarSign,
   Calendar,
   MapPin,
   AlertCircle
@@ -29,11 +27,7 @@ const Payment = () => {
     nameOnCard: ''
   });
 
-  useEffect(() => {
-    loadTripDetails();
-  }, [id]);
-
-  const loadTripDetails = async () => {
+  const loadTripDetails = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await apiService.getTripById(id);
@@ -59,7 +53,11 @@ const Payment = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [id, navigate]);
+
+  useEffect(() => {
+    loadTripDetails();
+  }, [loadTripDetails]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
