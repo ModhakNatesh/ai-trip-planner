@@ -1,6 +1,7 @@
 import { db } from '../config/firebase.js';
 import { callVertexAI } from '../services/vertexService.js';
 import { UserService } from '../services/userService.js';
+import weatherService from '../services/weatherService.js';
 
 export class TripController {
   static async getUserTrips(req, res) {
@@ -73,7 +74,7 @@ export class TripController {
   static async createTrip(req, res) {
     try {
       const uid = req.user?.uid || 'anonymous';
-      const { destination, startDate, endDate, budget, preferences, participants } = req.body;
+      const { destination, startDate, endDate, budget, preferences, participants, currentLocation } = req.body;
 
       if (!destination || !startDate || !endDate) {
         return res.status(400).json({
@@ -99,6 +100,7 @@ export class TripController {
           budget,
           preferences: preferences || {},
           participants: participants || [],
+          currentLocation: currentLocation || null,
           status: 'planning',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -122,6 +124,7 @@ export class TripController {
         budget,
         preferences: preferences || {},
         participants: participants || [],
+        currentLocation: currentLocation || null,
         status: 'planning',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -294,6 +297,18 @@ export class TripController {
         updatedAt: new Date().toISOString()
       };
 
+      // Check if significant trip details changed that would require itinerary regeneration
+      const significantFields = ['destination', 'startDate', 'endDate', 'budget', 'numberOfUsers', 'participants'];
+      const hasSignificantChange = significantFields.some(field => 
+        updates[field] !== undefined && updates[field] !== trip[field]
+      );
+
+      // Clear itinerary if significant details changed
+      if (hasSignificantChange && trip.itinerary) {
+        updatedTrip.itinerary = null;
+        updatedTrip.status = 'draft'; // Reset status to draft to allow regeneration
+      }
+
       // If trip was booked but not paid, reset booking status when edited
       if (trip.bookingStatus === 'booked' && trip.paymentStatus !== 'paid') {
         updatedTrip.bookingStatus = null;
@@ -380,26 +395,34 @@ export class TripController {
         budget: trip.budget
       });
 
-      // Generate itinerary using VertexAI
+      // Get weather forecast for the destination
+      let weatherData = null;
+      try {
+        console.log('🌤️ Fetching weather data for', trip.destination);
+        const startDate = new Date(trip.startDate);
+        const endDate = new Date(trip.endDate);
+        weatherData = await weatherService.getWeatherForTrip(trip.destination, startDate, endDate);
+        console.log('✅ Weather data fetched successfully');
+      } catch (error) {
+        console.warn('⚠️ Failed to fetch weather data:', error.message);
+        // Continue without weather data
+      }
+
+      // Generate itinerary using VertexAI with weather data
       const response = await callVertexAI({
         trip: { id, ...trip },
-        preferences
+        preferences,
+        weather: weatherData
       });
 
       console.log('📝 Vertex AI response:', {
         success: response.success,
-        fallback: response.fallback,
         hasData: !!response.data,
         dataStructure: response.data ? Object.keys(response.data) : null
       });
 
-      if (!response.success && !response.fallback) {
-        console.error('❌ Vertex AI failed completely:', response.error);
-        return res.status(500).json({
-          success: false,
-          error: 'Failed to generate itinerary',
-          details: response.error
-        });
+      if (!response.success) {
+        console.warn('⚠️ Vertex AI failed, using fallback response');
       }
 
       const itinerary = response.data;
@@ -432,7 +455,9 @@ export class TripController {
           itinerary,
           status: 'planned'
         },
-        message: response.fallback ? 'Itinerary generated using fallback content' : 'Itinerary generated successfully'
+        message: response.success ? 
+          'Itinerary generated successfully using AI!' : 
+          'Itinerary generated using smart fallback content'
       };
 
       // Log response size for debugging
@@ -820,18 +845,28 @@ export class TripController {
         });
       }
 
-      // Generate new itinerary with excluded places
+      // Get weather forecast for the destination
+      let weatherData = null;
+      try {
+        console.log('🌤️ Fetching weather data for regeneration:', trip.destination);
+        const startDate = new Date(trip.startDate);
+        const endDate = new Date(trip.endDate);
+        weatherData = await weatherService.getWeatherForTrip(trip.destination, startDate, endDate);
+        console.log('✅ Weather data fetched successfully for regeneration');
+      } catch (error) {
+        console.warn('⚠️ Failed to fetch weather data during regeneration:', error.message);
+        // Continue without weather data
+      }
+
+      // Generate new itinerary with excluded places and weather data
       const response = await callVertexAI({
         trip: { id, ...trip },
-        preferences: { ...preferences, excludedPlaces }
+        preferences: { ...preferences, excludedPlaces },
+        weather: weatherData
       });
 
       if (!response.success) {
-        return res.status(500).json({
-          success: false,
-          error: 'Failed to regenerate itinerary',
-          details: response.error
-        });
+        console.warn('⚠️ Vertex AI failed during regeneration, using fallback');
       }
 
       const itinerary = response.data;
