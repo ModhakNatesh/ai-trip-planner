@@ -25,6 +25,7 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import WeatherCard from '../components/ui/WeatherCard';
+import GoogleMap from '../components/ui/GoogleMap';
 import { apiService } from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -380,81 +381,99 @@ const TripDetails = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid md:grid-cols-4 gap-6">
-            <div className="flex items-center">
-              <Calendar className="h-5 w-5 mr-3" />
-              <div>
-                <p className="font-medium">{formatDate(trip.startDate)}</p>
-                <p className="text-sm text-blue-200">to {formatDate(trip.endDate)}</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center">
-              <Clock className="h-5 w-5 mr-3" />
-              <div>
-                <p className="font-medium">{formatDateRange(trip.startDate, trip.endDate)}</p>
-                <p className="text-sm text-blue-200">Duration</p>
-              </div>
-            </div>
-            
-            {trip.budget && (
-              <div className="flex items-center">
-                <DollarSign className="h-5 w-5 mr-3" />
-                <div>
-                  <p className="font-medium">${parseInt(trip.budget).toLocaleString()}</p>
-                  <p className="text-sm text-blue-200">Budget</p>
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center">
-              <Users className="h-5 w-5 mr-3" />
-              <div>
-                <p className="font-medium">{(trip.participants?.length || 0) + 1} Participants</p>
-                <p className="text-sm text-blue-200">Trip Members</p>
-              </div>
-            </div>
-          </div>
-          <div className="mt-6 pt-6 border-t border-blue-500/20">
-            <h3 className="text-lg font-medium mb-3">Trip Members</h3>
-            <div className="space-y-2">
-              {/* Always show owner */}
-              <div className="flex items-center justify-between bg-blue-500/10 rounded-lg px-3 py-2">
+          <div className="grid lg:grid-cols-5 gap-6">
+            {/* Trip Details - 65% width (3/5) */}
+            <div className="lg:col-span-3 space-y-6">
+              <div className="grid md:grid-cols-2 gap-6">
                 <div className="flex items-center">
-                  <Users className="h-4 w-4 mr-2" />
-                  <span className="font-medium">{trip.ownerName || trip.ownerEmail || 'Trip Owner'}</span>
-                  {trip.ownerEmail && (
-                    <span className="ml-2 text-sm text-white/70">{trip.ownerEmail}</span>
-                  )}
+                  <Calendar className="h-5 w-5 mr-3" />
+                  <div>
+                    <p className="font-medium">{formatDate(trip.startDate)}</p>
+                    <p className="text-sm text-blue-200">to {formatDate(trip.endDate)}</p>
+                  </div>
                 </div>
-                <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded">Owner</span>
-              </div>
+                
+                <div className="flex items-center">
+                  <Clock className="h-5 w-5 mr-3" />
+                  <div>
+                    <p className="font-medium">{formatDateRange(trip.startDate, trip.endDate)}</p>
+                    <p className="text-sm text-blue-200">Duration</p>
+                  </div>
+                </div>
+                
+                {trip.budget && (
+                  <div className="flex items-center">
+                    <DollarSign className="h-5 w-5 mr-3" />
+                    <div>
+                      <p className="font-medium">${parseInt(trip.budget).toLocaleString()}</p>
+                      <p className="text-sm text-blue-200">Budget</p>
+                    </div>
+                  </div>
+                )}
 
-              {/* Show participants */}
-              {trip.participantDetails ? (
-                trip.participantDetails.map((participant) => (
-                  <div key={participant.email} className="flex items-center justify-between bg-blue-500/10 rounded-lg px-3 py-2">
+                <div className="flex items-center">
+                  <Users className="h-5 w-5 mr-3" />
+                  <div>
+                    <p className="font-medium">{(trip.participants?.length || 0) + 1} Participants</p>
+                    <p className="text-sm text-blue-200">Trip Members</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="pt-6 border-t border-blue-500/20">
+                <h3 className="text-lg font-medium mb-3">Trip Members</h3>
+                <div className="space-y-2">
+                  {/* Always show owner */}
+                  <div className="flex items-center justify-between bg-blue-500/10 rounded-lg px-3 py-2">
                     <div className="flex items-center">
                       <Users className="h-4 w-4 mr-2" />
-                      <span className="font-medium">{participant.name}</span>
-                      <span className="ml-2 text-sm text-white/70">{participant.email}</span>
+                      <span className="font-medium">{trip.ownerName || trip.ownerEmail || 'Trip Owner'}</span>
+                      {trip.ownerEmail && (
+                        <span className="ml-2 text-sm text-white/70">{trip.ownerEmail}</span>
+                      )}
                     </div>
-                    <span className="text-xs bg-purple-500 text-white px-2 py-0.5 rounded">Member</span>
+                    <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded">Owner</span>
                   </div>
-                ))
-              ) : trip.participants && trip.participants.length > 0 ? (
-                // Fallback to just emails if no details available
-                trip.participants.map((email) => (
-                  <div key={email} className="flex items-center justify-between bg-blue-500/10 rounded-lg px-3 py-2">
-                    <div className="flex items-center">
-                      <Users className="h-4 w-4 mr-2" />
-                      <span className="font-medium">{email.split('@')[0]}</span>
-                      <span className="ml-2 text-sm text-white/70">{email}</span>
-                    </div>
-                    <span className="text-xs bg-purple-500 text-white px-2 py-0.5 rounded">Member</span>
-                  </div>
-                ))
-              ) : null}
+
+                  {/* Show participants */}
+                  {trip.participantDetails ? (
+                    trip.participantDetails.map((participant) => (
+                      <div key={participant.email} className="flex items-center justify-between bg-blue-500/10 rounded-lg px-3 py-2">
+                        <div className="flex items-center">
+                          <Users className="h-4 w-4 mr-2" />
+                          <span className="font-medium">{participant.name}</span>
+                          <span className="ml-2 text-sm text-white/70">{participant.email}</span>
+                        </div>
+                        <span className="text-xs bg-purple-500 text-white px-2 py-0.5 rounded">Member</span>
+                      </div>
+                    ))
+                  ) : trip.participants && trip.participants.length > 0 ? (
+                    // Fallback to just emails if no details available
+                    trip.participants.map((email) => (
+                      <div key={email} className="flex items-center justify-between bg-blue-500/10 rounded-lg px-3 py-2">
+                        <div className="flex items-center">
+                          <Users className="h-4 w-4 mr-2" />
+                          <span className="font-medium">{email.split('@')[0]}</span>
+                          <span className="ml-2 text-sm text-white/70">{email}</span>
+                        </div>
+                        <span className="text-xs bg-purple-500 text-white px-2 py-0.5 rounded">Member</span>
+                      </div>
+                    ))
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            {/* Map - 35% width (2/5) */}
+            <div className="lg:col-span-2">
+              <GoogleMap 
+                destination={trip.destination}
+                height="400px"
+                zoom={4}
+                showLocationInfo={false}
+                showBoundaries={true}
+                className="w-full h-full rounded-lg overflow-hidden border border-blue-400/30"
+              />
             </div>
           </div>
         </CardContent>
@@ -623,7 +642,7 @@ const TripDetails = () => {
                 <WeatherCard weatherInfo={itinerary.weatherInfo} isCompact={true} />
               )}
               
-              <div className="grid md:grid-cols-2 gap-6">
+              <div className="grid md:grid-cols-2 gap-6 mt-6">
                 <div>
                   <h4 className="font-medium mb-2 flex items-center">
                     <Clock className="h-4 w-4 mr-2" />
