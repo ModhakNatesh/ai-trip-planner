@@ -22,7 +22,6 @@ A full-stack web application that uses AI to help users plan their perfect trips
 app/
 ├── client/          # React frontend (Vite + Tailwind + shadcn/ui)
 ├── server/          # Node.js backend (Express + Firebase Admin)
-├── shared/          # Shared utilities and constants
 ├── package.json     # Root package.json with workspace scripts
 └── README.md        # This file
 ```
@@ -265,11 +264,8 @@ server/
 ├── models/            # Data models (future)
 └── package.json
 
-shared/
-├── validation.js      # Validation utilities
-├── dateUtils.js       # Date helper functions
-├── constants.js       # Shared constants
-└── index.js           # Main export
+index.js
+
 ```
 
 ## 🚢 Deployment
@@ -364,8 +360,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support
 
 For questions and support:
-- Email: your-email@example.com
-- GitHub Issues: [Create an issue](https://github.com/your-username/ai-trip-planner/issues)
+- Email: modhaknatesh@gmail.com
+- GitHub Issues: [Create an issue](https://github.com/ModhakNatesh/ai-trip-planner/issues)
 
 ---
 
