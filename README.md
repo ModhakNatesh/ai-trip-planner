@@ -14,7 +14,7 @@ A full-stack web application that uses AI to help users plan their perfect trips
 - **Trip Management**: Create, edit, and manage multiple trips
 - **Real-time Updates**: Live synchronization of trip data across devices
 - **Responsive Design**: Beautiful, mobile-first UI built with Tailwind CSS and shadcn/ui
-- **Modern Architecture**: Monorepo structure with shared utilities
+- **Modern Architecture**: Monorepo structure for client and server apps
 
 ## 🏗️ Architecture
 
