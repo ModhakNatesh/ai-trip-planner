@@ -256,6 +256,7 @@ client/
 └── package.json
 
 server/
+├── index.js           # Express app entry point
 ├── routes/            # Express routes
 ├── controllers/       # Route handlers
 ├── middleware/        # Express middleware
@@ -263,8 +264,6 @@ server/
 ├── config/            # Server configuration
 ├── models/            # Data models (future)
 └── package.json
-
-index.js
 
 ```
 
